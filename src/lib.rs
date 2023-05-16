@@ -474,3 +474,6 @@ fn copystats(src: &Path, dest: &File) -> Result<(), OpenError> {
         .permissions();
     dest.set_permissions(perms).map_err(OpenError::set_metadata)
 }
+
+#[cfg(test)]
+mod tests;
