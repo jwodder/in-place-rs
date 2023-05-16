@@ -3,7 +3,7 @@ use assert_fs::fixture::TempDir;
 use assert_fs::prelude::*;
 use cfg_if::cfg_if;
 use std::fs::{read_dir, read_link, remove_file};
-use std::io;
+use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use tmp_env::set_current_dir;
 
 cfg_if! {
@@ -55,9 +55,9 @@ fn nobackup() {
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new(&p).open().unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let inp = InPlace::new(&p).open().unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -68,14 +68,19 @@ fn nobackup() {
 }
 
 #[test]
-fn novars() {
+fn nobackup_bufwriter() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new(&p).open().unwrap();
-        for line in (&mut inp.reader).lines() {
-            writeln!(inp.writer, "{}", swapcase(&line.unwrap())).unwrap();
+        let inp = InPlace::new(&p).open().unwrap();
+        let reader = BufReader::new(inp.reader());
+        {
+            let mut writer = BufWriter::new(inp.writer());
+            for line in reader.lines() {
+                writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+            }
+            writer.flush().unwrap();
         }
         inp.save().unwrap();
     }
@@ -89,12 +94,12 @@ fn backup_ext() {
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new(&p)
+        let inp = InPlace::new(&p)
             .backup(Backup::AppendExtension("~".into()))
             .open()
             .unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -111,12 +116,12 @@ fn backup_filename() {
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new(&p)
+        let inp = InPlace::new(&p)
             .backup(Backup::FileName("backup.txt".into()))
             .open()
             .unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -133,12 +138,12 @@ fn backup_path() {
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new(&p)
+        let inp = InPlace::new(&p)
             .backup(Backup::Path(tmpdir.child("backup.txt").path().into()))
             .open()
             .unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -184,9 +189,9 @@ fn delete_nobackup() {
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new(&p).open().unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let inp = InPlace::new(&p).open().unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for (i, line) in reader.lines().enumerate() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
             if i == 2 {
@@ -207,12 +212,12 @@ fn delete_backup() {
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new(&p)
+        let inp = InPlace::new(&p)
             .backup(Backup::FileName("backup.txt".into()))
             .open()
             .unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for (i, line) in reader.lines().enumerate() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
             if i == 2 {
@@ -232,9 +237,9 @@ fn discard_nobackup() {
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new(&p).open().unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let inp = InPlace::new(&p).open().unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -250,12 +255,12 @@ fn discard_backup() {
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new(&p)
+        let inp = InPlace::new(&p)
             .backup(Backup::FileName("backup.txt".into()))
             .open()
             .unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -274,12 +279,12 @@ fn overwrite_backup() {
     bkp.write_str("This is not the file you are looking for.\n")
         .unwrap();
     {
-        let mut inp = InPlace::new(&p)
+        let inp = InPlace::new(&p)
             .backup(Backup::Path(bkp.path().into()))
             .open()
             .unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -299,12 +304,12 @@ fn discard_overwrite_backup() {
     bkp.write_str("This is not the file you are looking for.\n")
         .unwrap();
     {
-        let mut inp = InPlace::new(&p)
+        let inp = InPlace::new(&p)
             .backup(Backup::Path(bkp.path().into()))
             .open()
             .unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -322,12 +327,12 @@ fn prechdir_backup() {
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new(&p)
+        let inp = InPlace::new(&p)
             .backup(Backup::Path("backup.txt".into()))
             .open()
             .unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -350,13 +355,13 @@ fn postchdir_backup() {
     p.write_str(TEXT).unwrap();
     let _chdir = set_current_dir(&filedir);
     {
-        let mut inp = InPlace::new("file.txt")
+        let inp = InPlace::new("file.txt")
             .backup(Backup::Path("backup.txt".into()))
             .open()
             .unwrap();
         let _chdir = set_current_dir(&wrongdir);
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -379,12 +384,12 @@ fn different_dir_backup() {
     let p = filedir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new("filedir/file.txt")
+        let inp = InPlace::new("filedir/file.txt")
             .backup(Backup::Path("bkpdir/backup.txt".into()))
             .open()
             .unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -408,12 +413,12 @@ fn different_dir_file_backup() {
     let p = filedir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new("filedir/file.txt")
+        let inp = InPlace::new("filedir/file.txt")
             .backup(Backup::Path("backup.txt".into()))
             .open()
             .unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -435,11 +440,11 @@ fn backup_dirpath() {
     let not_a_file = tmpdir.child("not-a-file");
     not_a_file.create_dir_all().unwrap();
     {
-        let mut inp = InPlace::new(&p)
+        let inp = InPlace::new(&p)
             .backup(Backup::Path(not_a_file.path().into()))
             .open()
             .unwrap();
-        writeln!(inp.writer, "This will be discarded.\n").unwrap();
+        writeln!(inp.writer(), "This will be discarded.\n").unwrap();
         let r = inp.save();
         assert!(r.is_err());
         // TODO: Make more assertions about `r`
@@ -458,11 +463,11 @@ fn backup_nosuchdir() {
     p.write_str(TEXT).unwrap();
     let backup = tmpdir.child("nonexistent").child("backup.txt");
     {
-        let mut inp = InPlace::new(&p)
+        let inp = InPlace::new(&p)
             .backup(Backup::Path(backup.path().into()))
             .open()
             .unwrap();
-        writeln!(inp.writer, "This will be discarded.\n").unwrap();
+        writeln!(inp.writer(), "This will be discarded.\n").unwrap();
         let r = inp.save();
         assert!(r.is_err());
         // TODO: Make more assertions about `r`
@@ -505,9 +510,9 @@ fn symlink_nobackup() {
         }
     }
     {
-        let mut inp = InPlace::new(&link).open().unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let inp = InPlace::new(&link).open().unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -545,12 +550,12 @@ fn symlink_backup_ext() {
         }
     }
     {
-        let mut inp = InPlace::new(&link)
+        let inp = InPlace::new(&link)
             .backup(Backup::AppendExtension("~".into()))
             .open()
             .unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -592,12 +597,12 @@ fn symlink_backup() {
         }
     }
     {
-        let mut inp = InPlace::new(&link)
+        let inp = InPlace::new(&link)
             .backup(Backup::Path(tmpdir.child("backup.txt").path().into()))
             .open()
             .unwrap();
-        let reader = &mut inp.reader;
-        let writer = &mut inp.writer;
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }

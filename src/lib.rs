@@ -2,9 +2,7 @@ use std::error;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, rename, File};
-use std::io::{
-    self, BufRead, BufReader, BufWriter, IoSlice, IoSliceMut, Read, Seek, SeekFrom, Write,
-};
+use std::io;
 use std::path::{Path, PathBuf};
 use tempfile::{Builder, NamedTempFile, PersistError};
 
@@ -56,12 +54,12 @@ impl InPlace {
             todo!()
         };
         // TODO: Check that `path` and `backup_path` are not the same file
-        let tmpfile = mktemp(&path)?;
-        copystats(&path, tmpfile.as_file())?;
-        let input = File::open(&path).map_err(OpenError::open)?;
+        let writer = mktemp(&path)?;
+        copystats(&path, writer.as_file())?;
+        let reader = File::open(&path).map_err(OpenError::open)?;
         Ok(InPlaceFile {
-            reader: InPlaceReader::new(input, path.clone()),
-            writer: InPlaceWriter::new(tmpfile),
+            reader,
+            writer,
             path,
             backup_path,
         })
@@ -96,23 +94,34 @@ impl Backup {
 
 #[derive(Debug)]
 pub struct InPlaceFile {
-    pub reader: InPlaceReader,
-    pub writer: InPlaceWriter,
+    reader: File,
+    writer: NamedTempFile,
     path: PathBuf,
     backup_path: Option<PathBuf>,
 }
 
 impl InPlaceFile {
-    pub fn save(mut self) -> Result<(), SaveError> {
-        let _ = self.writer.flush();
+    pub fn reader(&self) -> &File {
+        &self.reader
+    }
+
+    pub fn writer(&self) -> &File {
+        self.writer.as_file()
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn backup_path(&self) -> Option<&Path> {
+        self.backup_path.as_deref()
+    }
+
+    pub fn save(self) -> Result<(), SaveError> {
         if let Some(bp) = self.backup_path.as_ref() {
             rename(&self.path, bp).map_err(SaveError::backup)?;
         }
-        let r = self
-            .writer
-            .into_tempfile()
-            .map_err(SaveError::into_tempfile)
-            .and_then(|tmpfile| tmpfile.persist(&self.path).map_err(SaveError::persist));
+        let r = self.writer.persist(&self.path).map_err(SaveError::persist);
         if r.is_err() {
             if let Some(bp) = self.backup_path.as_ref() {
                 let _ = rename(bp, &self.path);
@@ -122,10 +131,7 @@ impl InPlaceFile {
     }
 
     pub fn discard(self) -> Result<(), DiscardError> {
-        self.writer
-            .into_tempfile()
-            .map_err(DiscardError::into_tempfile)
-            .and_then(|tmpfile| tmpfile.close().map_err(DiscardError::rmtemp))
+        self.writer.close().map_err(DiscardError::rmtemp)
     }
 }
 
@@ -135,124 +141,6 @@ impl InPlaceFile {
 //       // discard() and ignore error
 //    }
 //}
-
-#[derive(Debug)]
-pub struct InPlaceReader {
-    inner: BufReader<File>,
-    path: PathBuf,
-}
-
-impl InPlaceReader {
-    fn new(file: File, path: PathBuf) -> Self {
-        Self {
-            inner: BufReader::new(file),
-            path,
-        }
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    pub fn as_file(&self) -> &File {
-        self.inner.get_ref()
-    }
-
-    pub fn as_mut_file(&mut self) -> &mut File {
-        self.inner.get_mut()
-    }
-}
-
-impl Read for InPlaceReader {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(buf)
-    }
-
-    fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
-        self.inner.read_exact(buf)
-    }
-
-    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.inner.read_vectored(bufs)
-    }
-
-    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> io::Result<usize> {
-        self.inner.read_to_end(buf)
-    }
-
-    fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
-        self.inner.read_to_string(buf)
-    }
-}
-
-impl BufRead for InPlaceReader {
-    fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        self.inner.fill_buf()
-    }
-
-    fn consume(&mut self, amt: usize) {
-        self.inner.consume(amt);
-    }
-}
-
-impl Seek for InPlaceReader {
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        self.inner.seek(pos)
-    }
-
-    fn stream_position(&mut self) -> io::Result<u64> {
-        self.inner.stream_position()
-    }
-}
-
-#[derive(Debug)]
-pub struct InPlaceWriter(BufWriter<NamedTempFile>);
-
-impl InPlaceWriter {
-    fn new(file: NamedTempFile) -> Self {
-        InPlaceWriter(BufWriter::new(file))
-    }
-
-    fn into_tempfile(self) -> Result<NamedTempFile, io::IntoInnerError<BufWriter<NamedTempFile>>> {
-        self.0.into_inner()
-    }
-
-    pub fn path(&self) -> &Path {
-        self.0.get_ref().path()
-    }
-
-    pub fn as_file(&self) -> &File {
-        self.0.get_ref().as_file()
-    }
-
-    pub fn as_mut_file(&mut self) -> &mut File {
-        self.0.get_mut().as_file_mut()
-    }
-}
-
-impl Write for InPlaceWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.write(buf)
-    }
-
-    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.0.write_all(buf)
-    }
-
-    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.0.write_vectored(bufs)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.0.flush()
-    }
-}
-
-impl Seek for InPlaceWriter {
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        self.0.seek(pos)
-    }
-}
 
 #[derive(Debug)]
 pub struct OpenError {
@@ -344,10 +232,6 @@ impl SaveError {
     fn persist(_e: PersistError) -> SaveError {
         todo!()
     }
-
-    fn into_tempfile(_e: io::IntoInnerError<BufWriter<NamedTempFile>>) -> SaveError {
-        todo!()
-    }
 }
 
 impl fmt::Display for SaveError {
@@ -382,10 +266,6 @@ impl DiscardError {
     }
 
     fn rmtemp(_e: io::Error) -> DiscardError {
-        todo!()
-    }
-
-    fn into_tempfile(_e: io::IntoInnerError<BufWriter<NamedTempFile>>) -> DiscardError {
         todo!()
     }
 }
