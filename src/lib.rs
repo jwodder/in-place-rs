@@ -48,21 +48,24 @@ impl InPlace {
     }
 
     pub fn open(&mut self) -> Result<InPlaceFile, OpenError> {
-        let path = if !self.follow_symlinks {
-            todo!()
-        } else {
-            self.path.canonicalize().map_err(OpenError::canonicalize)?
-        };
-        if self.move_first {
+        let (path, backup_path) = if !self.follow_symlinks {
             todo!()
         } else {
             let backup_path = match self.backup.as_ref() {
-                Some(bkp) => match bkp.apply(&path) {
-                    Some(bp) => Some(bp),
+                Some(bkp) => match bkp.apply(&self.path) {
+                    Some(bp) => Some(absolutize(&bp)?),
                     None => return Err(OpenError::backup_path()),
                 },
                 None => None,
             };
+            (
+                self.path.canonicalize().map_err(OpenError::canonicalize)?,
+                backup_path,
+            )
+        };
+        if self.move_first {
+            todo!()
+        } else {
             // TODO: Check that `path` and `backup_path` are not the same file
             let tmpfile = mktemp(&path)?;
             copystats(&path, tmpfile.as_file())?;
@@ -131,6 +134,8 @@ impl InPlaceFile {
 
     pub fn save(mut self) -> Result<(), SaveError> {
         let _ = self.writer.flush();
+        dbg!(&self.path);
+        dbg!(&self.backup_path);
         if let Some(bp) = self.backup_path.as_ref() {
             rename(&self.path, bp).map_err(SaveError::backup)?;
         }
@@ -319,6 +324,10 @@ impl OpenError {
         todo!()
     }
 
+    fn cwd(_e: io::Error) -> OpenError {
+        todo!()
+    }
+
     fn backup_path() -> OpenError {
         todo!()
     }
@@ -448,6 +457,15 @@ pub struct DiscardErrorKind;
 impl DiscardErrorKind {
     fn message(&self) -> &'static str {
         todo!()
+    }
+}
+
+fn absolutize(filepath: &Path) -> Result<PathBuf, OpenError> {
+    if filepath.is_absolute() {
+        Ok(filepath.into())
+    } else {
+        let cwd = std::env::current_dir().map_err(OpenError::cwd)?;
+        Ok(cwd.join(filepath))
     }
 }
 

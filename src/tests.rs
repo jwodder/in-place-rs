@@ -479,7 +479,7 @@ fn edit_nonexistent() {
 #[test]
 fn symlink_nobackup() {
     let tmpdir = TempDir::new().unwrap();
-    let realdir = tmpdir.child("realdir");
+    let realdir = tmpdir.child("real");
     realdir.create_dir_all().unwrap();
     let real = realdir.child("realfile.txt");
     real.write_str(TEXT).unwrap();
@@ -488,9 +488,9 @@ fn symlink_nobackup() {
     let link = linkdir.child("linkfile.txt");
     cfg_if! {
         if #[cfg(unix)] {
-            symlink(Path::new("../realdir/realfile.txt"), &link).unwrap()
+            symlink(Path::new("../real/realfile.txt"), &link).unwrap()
         } else if #[cfg(windows)] {
-            if symlink_file(Path::new("..\\realdir\\realfile.txt"), &link).is_err() {
+            if symlink_file(Path::new("..\\real\\realfile.txt"), &link).is_err() {
                 // Assume symlinks aren't enabled for us and skip the test
                 return;
             }
@@ -512,9 +512,9 @@ fn symlink_nobackup() {
     assert!(link.is_symlink());
     cfg_if! {
         if #[cfg(unix)] {
-            assert_eq!(read_link(&link).unwrap(), Path::new("../realdir/realfile.txt"));
+            assert_eq!(read_link(&link).unwrap(), Path::new("../real/realfile.txt"));
         } else if #[cfg(windows)] {
-            assert_eq!(read_link(&link).unwrap(), Path::new("..\\realdir\\realfile.txt"));
+            assert_eq!(read_link(&link).unwrap(), Path::new("..\\real\\realfile.txt"));
         }
     }
     real.assert(swapcase(TEXT));
@@ -524,7 +524,7 @@ fn symlink_nobackup() {
 #[test]
 fn symlink_backup_ext() {
     let tmpdir = TempDir::new().unwrap();
-    let realdir = tmpdir.child("realdir");
+    let realdir = tmpdir.child("real");
     realdir.create_dir_all().unwrap();
     let real = realdir.child("realfile.txt");
     real.write_str(TEXT).unwrap();
@@ -533,9 +533,9 @@ fn symlink_backup_ext() {
     let link = linkdir.child("linkfile.txt");
     cfg_if! {
         if #[cfg(unix)] {
-            symlink(Path::new("../realdir/realfile.txt"), &link).unwrap()
+            symlink(Path::new("../real/realfile.txt"), &link).unwrap()
         } else if #[cfg(windows)] {
-            if symlink_file(Path::new("..\\realdir\\realfile.txt"), &link).is_err() {
+            if symlink_file(Path::new("..\\real\\realfile.txt"), &link).is_err() {
                 // Assume symlinks aren't enabled for us and skip the test
                 return;
             }
@@ -563,9 +563,9 @@ fn symlink_backup_ext() {
     assert!(link.is_symlink());
     cfg_if! {
         if #[cfg(unix)] {
-            assert_eq!(read_link(&link).unwrap(), Path::new("../realdir/realfile.txt"));
+            assert_eq!(read_link(&link).unwrap(), Path::new("../real/realfile.txt"));
         } else if #[cfg(windows)] {
-            assert_eq!(read_link(&link).unwrap(), Path::new("..\\realdir\\realfile.txt"));
+            assert_eq!(read_link(&link).unwrap(), Path::new("..\\real\\realfile.txt"));
         }
     }
     real.assert(swapcase(TEXT));
@@ -576,7 +576,7 @@ fn symlink_backup_ext() {
 #[test]
 fn symlink_backup() {
     let tmpdir = TempDir::new().unwrap();
-    let realdir = tmpdir.child("realdir");
+    let realdir = tmpdir.child("real");
     realdir.create_dir_all().unwrap();
     let real = realdir.child("realfile.txt");
     real.write_str(TEXT).unwrap();
@@ -585,9 +585,9 @@ fn symlink_backup() {
     let link = linkdir.child("linkfile.txt");
     cfg_if! {
         if #[cfg(unix)] {
-            symlink(Path::new("../realdir/realfile.txt"), &link).unwrap()
+            symlink(Path::new("../real/realfile.txt"), &link).unwrap()
         } else if #[cfg(windows)] {
-            if symlink_file(Path::new("..\\realdir\\realfile.txt"), &link).is_err() {
+            if symlink_file(Path::new("..\\real\\realfile.txt"), &link).is_err() {
                 // Assume symlinks aren't enabled for us and skip the test
                 return;
             }
@@ -607,18 +607,15 @@ fn symlink_backup() {
         }
         inp.save().unwrap();
     }
-    assert_eq!(
-        listdir(&tmpdir).unwrap(),
-        ["backup.txt", "linkdir", "realdir"]
-    );
+    assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "link", "real"]);
     assert_eq!(listdir(&realdir).unwrap(), ["realfile.txt"]);
     assert_eq!(listdir(&linkdir).unwrap(), ["linkfile.txt"]);
     assert!(link.is_symlink());
     cfg_if! {
         if #[cfg(unix)] {
-            assert_eq!(read_link(&link).unwrap(), Path::new("../realdir/realfile.txt"));
+            assert_eq!(read_link(&link).unwrap(), Path::new("../real/realfile.txt"));
         } else if #[cfg(windows)] {
-            assert_eq!(read_link(&link).unwrap(), Path::new("..\\realdir\\realfile.txt"));
+            assert_eq!(read_link(&link).unwrap(), Path::new("..\\real\\realfile.txt"));
         }
     }
     real.assert(swapcase(TEXT));
