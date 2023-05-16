@@ -48,7 +48,7 @@ impl InPlace {
     }
 
     pub fn open(&mut self) -> Result<InPlaceFile, OpenError> {
-        let path = if self.follow_symlinks {
+        let path = if !self.follow_symlinks {
             todo!()
         } else {
             self.path.canonicalize().map_err(OpenError::canonicalize)?
@@ -105,21 +105,15 @@ impl Backup {
 
 #[derive(Debug)]
 pub struct InPlaceFile {
-    reader: InPlaceReader,
-    writer: InPlaceWriter,
+    pub reader: InPlaceReader,
+    pub writer: InPlaceWriter,
     path: PathBuf,
     backup_path: Option<PathBuf>,
 }
 
 impl InPlaceFile {
-    pub fn reader(&mut self) -> &mut InPlaceReader {
-        &mut self.reader
-    }
-
-    pub fn writer(&mut self) -> &mut InPlaceWriter {
-        &mut self.writer
-    }
-
+    /* // Consider removing these, as they can't be called while a mutable
+     * borrow on reader of writer is extant.
     // Returns the path to the file that was opened for in-place editing
     pub fn path(&self) -> &Path {
         &self.path
@@ -128,6 +122,7 @@ impl InPlaceFile {
     pub fn backup_path(&self) -> Option<&Path> {
         self.backup_path.as_deref()
     }
+    */
 
     // TODO: Is this a good idea?
     //pub fn temp_path(&self) -> &Path {
@@ -135,7 +130,7 @@ impl InPlaceFile {
     //}
 
     pub fn save(mut self) -> Result<(), SaveError> {
-        let _ = self.writer().flush();
+        let _ = self.writer.flush();
         if let Some(bp) = self.backup_path.as_ref() {
             rename(&self.path, bp).map_err(SaveError::backup)?;
         }

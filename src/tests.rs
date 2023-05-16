@@ -49,10 +49,26 @@ fn nobackup() {
     p.write_str(TEXT).unwrap();
     {
         let mut inp = InPlace::new(&p).open().unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(swapcase(TEXT));
+}
+
+#[test]
+fn novars() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    {
+        let mut inp = InPlace::new(&p).open().unwrap();
+        for line in (&mut inp.reader).lines() {
+            writeln!(inp.writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
         inp.save().unwrap();
     }
@@ -70,8 +86,8 @@ fn backup_ext() {
             .backup(Backup::AppendExtension("~".into()))
             .open()
             .unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -92,8 +108,8 @@ fn backup_filename() {
             .backup(Backup::FileName("backup.txt".into()))
             .open()
             .unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -114,8 +130,8 @@ fn backup_path() {
             .backup(Backup::Path(tmpdir.child("backup.txt").path().into()))
             .open()
             .unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -148,7 +164,7 @@ fn nop_nobackup() {
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let mut inp = InPlace::new(&p).open().unwrap();
+        let inp = InPlace::new(&p).open().unwrap();
         inp.save().unwrap();
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
@@ -164,12 +180,12 @@ fn delete_nobackup() {
     p.write_str(TEXT).unwrap();
     {
         let mut inp = InPlace::new(&p).open().unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for (i, line) in reader.lines().enumerate() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
             if i == 2 {
-                remove_file(inp.path()).unwrap();
+                remove_file(&p).unwrap();
             }
         }
         inp.save().unwrap();
@@ -190,12 +206,12 @@ fn delete_backup() {
             .backup(Backup::FileName("backup.txt".into()))
             .open()
             .unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for (i, line) in reader.lines().enumerate() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
             if i == 2 {
-                remove_file(inp.path()).unwrap();
+                remove_file(&p).unwrap();
             }
         }
         let r = inp.save();
@@ -212,8 +228,8 @@ fn discard_nobackup() {
     p.write_str(TEXT).unwrap();
     {
         let mut inp = InPlace::new(&p).open().unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -233,8 +249,8 @@ fn discard_backup() {
             .backup(Backup::FileName("backup.txt".into()))
             .open()
             .unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -257,8 +273,8 @@ fn overwrite_backup() {
             .backup(Backup::Path(bkp.path().into()))
             .open()
             .unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -282,8 +298,8 @@ fn discard_overwrite_backup() {
             .backup(Backup::Path(bkp.path().into()))
             .open()
             .unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -305,8 +321,8 @@ fn prechdir_backup() {
             .backup(Backup::Path("backup.txt".into()))
             .open()
             .unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -334,8 +350,8 @@ fn postchdir_backup() {
             .open()
             .unwrap();
         let _chdir = set_current_dir(&wrongdir);
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -362,8 +378,8 @@ fn different_dir_backup() {
             .backup(Backup::Path("bkpdir/backup.txt".into()))
             .open()
             .unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -391,8 +407,8 @@ fn different_dir_file_backup() {
             .backup(Backup::Path("backup.txt".into()))
             .open()
             .unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -418,8 +434,7 @@ fn backup_dirpath() {
             .backup(Backup::Path(not_a_file.path().into()))
             .open()
             .unwrap();
-        let writer = inp.writer();
-        writeln!(writer, "This will be discarded.\n").unwrap();
+        writeln!(inp.writer, "This will be discarded.\n").unwrap();
         let r = inp.save();
         assert!(r.is_err());
         // TODO: Make more assertions about `r`
@@ -442,8 +457,7 @@ fn backup_nosuchdir() {
             .backup(Backup::Path(backup.path().into()))
             .open()
             .unwrap();
-        let writer = inp.writer();
-        writeln!(writer, "This will be discarded.\n").unwrap();
+        writeln!(inp.writer, "This will be discarded.\n").unwrap();
         let r = inp.save();
         assert!(r.is_err());
         // TODO: Make more assertions about `r`
@@ -456,7 +470,7 @@ fn backup_nosuchdir() {
 fn edit_nonexistent() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
-    let r = InPlace::new(&p).open();
+    let r = InPlace::new(p).open();
     assert!(r.is_err());
     // TODO: Assert more about `r`
     assert!(listdir(&tmpdir).unwrap().is_empty());
@@ -468,7 +482,7 @@ fn symlink_nobackup() {
     let realdir = tmpdir.child("realdir");
     realdir.create_dir_all().unwrap();
     let real = realdir.child("realfile.txt");
-    real.write_str(TEXT);
+    real.write_str(TEXT).unwrap();
     let linkdir = tmpdir.child("link");
     linkdir.create_dir_all().unwrap();
     let link = linkdir.child("linkfile.txt");
@@ -486,8 +500,8 @@ fn symlink_nobackup() {
     }
     {
         let mut inp = InPlace::new(&link).open().unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
@@ -513,7 +527,7 @@ fn symlink_backup_ext() {
     let realdir = tmpdir.child("realdir");
     realdir.create_dir_all().unwrap();
     let real = realdir.child("realfile.txt");
-    real.write_str(TEXT);
+    real.write_str(TEXT).unwrap();
     let linkdir = tmpdir.child("link");
     linkdir.create_dir_all().unwrap();
     let link = linkdir.child("linkfile.txt");
@@ -534,15 +548,18 @@ fn symlink_backup_ext() {
             .backup(Backup::AppendExtension("~".into()))
             .open()
             .unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
         inp.save().unwrap();
     }
     assert_eq!(listdir(&realdir).unwrap(), ["realfile.txt"]);
-    assert_eq!(listdir(&linkdir).unwrap(), ["linkfile.txt", "linkfile.txt~"]);
+    assert_eq!(
+        listdir(&linkdir).unwrap(),
+        ["linkfile.txt", "linkfile.txt~"]
+    );
     assert!(link.is_symlink());
     cfg_if! {
         if #[cfg(unix)] {
@@ -562,7 +579,7 @@ fn symlink_backup() {
     let realdir = tmpdir.child("realdir");
     realdir.create_dir_all().unwrap();
     let real = realdir.child("realfile.txt");
-    real.write_str(TEXT);
+    real.write_str(TEXT).unwrap();
     let linkdir = tmpdir.child("link");
     linkdir.create_dir_all().unwrap();
     let link = linkdir.child("linkfile.txt");
@@ -583,14 +600,17 @@ fn symlink_backup() {
             .backup(Backup::Path(tmpdir.child("backup.txt").path().into()))
             .open()
             .unwrap();
-        let reader = inp.reader();
-        let writer = inp.writer();
+        let reader = &mut inp.reader;
+        let writer = &mut inp.writer;
         for line in reader.lines() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
         }
         inp.save().unwrap();
     }
-    assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "linkdir", "realdir"]);
+    assert_eq!(
+        listdir(&tmpdir).unwrap(),
+        ["backup.txt", "linkdir", "realdir"]
+    );
     assert_eq!(listdir(&realdir).unwrap(), ["realfile.txt"]);
     assert_eq!(listdir(&linkdir).unwrap(), ["linkfile.txt"]);
     assert!(link.is_symlink());
