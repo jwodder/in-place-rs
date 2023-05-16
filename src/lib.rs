@@ -13,7 +13,6 @@ use tempfile::{Builder, NamedTempFile, PersistError};
 pub struct InPlace {
     path: PathBuf,
     backup: Option<Backup>,
-    move_first: bool,
     follow_symlinks: bool,
 }
 
@@ -22,7 +21,6 @@ impl InPlace {
         InPlace {
             path: path.as_ref().into(),
             backup: None,
-            move_first: false,
             follow_symlinks: true,
         }
     }
@@ -37,20 +35,13 @@ impl InPlace {
         self
     }
 
-    pub fn move_first(&mut self, flag: bool) -> &mut Self {
-        self.move_first = flag;
-        self
-    }
-
     pub fn follow_symlinks(&mut self, flag: bool) -> &mut Self {
         self.follow_symlinks = flag;
         self
     }
 
     pub fn open(&mut self) -> Result<InPlaceFile, OpenError> {
-        let (path, backup_path) = if !self.follow_symlinks {
-            todo!()
-        } else {
+        let (path, backup_path) = if self.follow_symlinks {
             let backup_path = match self.backup.as_ref() {
                 Some(bkp) => match bkp.apply(&self.path) {
                     Some(bp) => Some(absolutize(&bp)?),
@@ -62,21 +53,19 @@ impl InPlace {
                 self.path.canonicalize().map_err(OpenError::canonicalize)?,
                 backup_path,
             )
-        };
-        if self.move_first {
-            todo!()
         } else {
-            // TODO: Check that `path` and `backup_path` are not the same file
-            let tmpfile = mktemp(&path)?;
-            copystats(&path, tmpfile.as_file())?;
-            let input = File::open(&path).map_err(OpenError::open)?;
-            Ok(InPlaceFile {
-                reader: InPlaceReader::new(input, path.clone()),
-                writer: InPlaceWriter::new(tmpfile),
-                path,
-                backup_path,
-            })
-        }
+            todo!()
+        };
+        // TODO: Check that `path` and `backup_path` are not the same file
+        let tmpfile = mktemp(&path)?;
+        copystats(&path, tmpfile.as_file())?;
+        let input = File::open(&path).map_err(OpenError::open)?;
+        Ok(InPlaceFile {
+            reader: InPlaceReader::new(input, path.clone()),
+            writer: InPlaceWriter::new(tmpfile),
+            path,
+            backup_path,
+        })
     }
 }
 
