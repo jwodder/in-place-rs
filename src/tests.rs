@@ -228,7 +228,9 @@ fn delete_backup() {
         }
         let r = inp.save();
         assert!(r.is_err());
-        // TODO: Make more assertions about `r`
+        let e = r.unwrap_err();
+        assert_eq!(e.kind(), SaveErrorKind::SaveBackup);
+        assert_eq!(e.to_string(), "failed to move file to backup path");
     }
     assert!(listdir(&tmpdir).unwrap().is_empty());
 }
@@ -449,7 +451,9 @@ fn backup_dirpath() {
         writeln!(inp.writer(), "This will be discarded.\n").unwrap();
         let r = inp.save();
         assert!(r.is_err());
-        // TODO: Make more assertions about `r`
+        let e = r.unwrap_err();
+        assert_eq!(e.kind(), SaveErrorKind::SaveBackup);
+        assert_eq!(e.to_string(), "failed to move file to backup path");
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt", "not-a-file"]);
     assert!(listdir(&not_a_file).unwrap().is_empty());
@@ -472,7 +476,9 @@ fn backup_nosuchdir() {
         writeln!(inp.writer(), "This will be discarded.\n").unwrap();
         let r = inp.save();
         assert!(r.is_err());
-        // TODO: Make more assertions about `r`
+        let e = r.unwrap_err();
+        assert_eq!(e.kind(), SaveErrorKind::SaveBackup);
+        assert_eq!(e.to_string(), "failed to move file to backup path");
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     p.assert(TEXT);

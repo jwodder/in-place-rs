@@ -136,7 +136,7 @@ impl InPlaceFile {
 
     pub fn save(self) -> Result<(), SaveError> {
         if let Some(bp) = self.backup_path.as_ref() {
-            rename(&self.path, bp).map_err(SaveError::backup)?;
+            rename(&self.path, bp).map_err(SaveError::save_backup)?;
         }
         let r = self.writer.persist(&self.path).map_err(SaveError::persist);
         if r.is_err() {
@@ -277,12 +277,12 @@ impl OpenErrorKind {
             Canonicalize => "failed to canonicalize path",
             CurrentDir => "failed to fetch current directory",
             EmptyBackup => "backup path or extension is empty",
-            GetMetadata => "failed to get metadata for path",
+            GetMetadata => "failed to get metadata for file",
             Mktemp => "failed to create temporary file",
             NoFilename => "path does not have a filename",
             NoParent => "path does not have a parent directory",
-            Open => "failed to open path for reading",
-            SetMetadata => "failed to set metadata on tempory file",
+            Open => "failed to open file for reading",
+            SetMetadata => "failed to set metadata on temporary file",
         }
     }
 }
@@ -306,12 +306,18 @@ impl SaveError {
         self.source
     }
 
-    fn backup(_e: io::Error) -> SaveError {
-        todo!()
+    fn save_backup(source: io::Error) -> SaveError {
+        SaveError {
+            kind: SaveErrorKind::SaveBackup,
+            source,
+        }
     }
 
-    fn persist(_e: PersistError) -> SaveError {
-        todo!()
+    fn persist(source: PersistError) -> SaveError {
+        SaveError {
+            kind: SaveErrorKind::PersistTemp,
+            source: source.error,
+        }
     }
 }
 
@@ -324,6 +330,23 @@ impl fmt::Display for SaveError {
 impl error::Error for SaveError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         Some(&self.source)
+    }
+}
+
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum SaveErrorKind {
+    PersistTemp,
+    SaveBackup,
+}
+
+impl SaveErrorKind {
+    fn message(&self) -> &'static str {
+        use SaveErrorKind::*;
+        match self {
+            PersistTemp => "failed to save temporary file at path",
+            SaveBackup => "failed to move file to backup path",
+        }
     }
 }
 
@@ -360,15 +383,6 @@ impl fmt::Display for DiscardError {
 impl error::Error for DiscardError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         Some(&self.source)
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct SaveErrorKind;
-
-impl SaveErrorKind {
-    fn message(&self) -> &'static str {
-        todo!()
     }
 }
 
