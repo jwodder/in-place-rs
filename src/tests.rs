@@ -21,6 +21,13 @@ static TEXT: &str = concat!(
     "\tAnd the mome raths outgrabe.\n",
 );
 
+static SWAPPED_TEXT: &str = concat!(
+    "'tWAS BRILLIG, AND THE SLITHY TOVES\n",
+    "\tdID GYRE AND GIMBLE IN THE WABE;\n",
+    "aLL MIMSY WERE THE BOROGOVES,\n",
+    "\taND THE MOME RATHS OUTGRABE.\n",
+);
+
 fn listdir(dirpath: &Path) -> io::Result<Vec<String>> {
     let mut files = Vec::new();
     for entry in read_dir(dirpath)? {
@@ -57,7 +64,7 @@ fn nobackup() {
         inp.save().unwrap();
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
-    p.assert(swapcase(TEXT));
+    p.assert(SWAPPED_TEXT);
 }
 
 #[test]
@@ -73,7 +80,7 @@ fn novars() {
         inp.save().unwrap();
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
-    p.assert(swapcase(TEXT));
+    p.assert(SWAPPED_TEXT);
 }
 
 #[test]
@@ -94,7 +101,7 @@ fn backup_ext() {
         inp.save().unwrap();
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt", "file.txt~"]);
-    p.assert(swapcase(TEXT));
+    p.assert(SWAPPED_TEXT);
     tmpdir.child("file.txt~").assert(TEXT);
 }
 
@@ -116,7 +123,7 @@ fn backup_filename() {
         inp.save().unwrap();
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "file.txt"]);
-    p.assert(swapcase(TEXT));
+    p.assert(SWAPPED_TEXT);
     tmpdir.child("backup.txt").assert(TEXT);
 }
 
@@ -138,7 +145,7 @@ fn backup_path() {
         inp.save().unwrap();
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "file.txt"]);
-    p.assert(swapcase(TEXT));
+    p.assert(SWAPPED_TEXT);
     tmpdir.child("backup.txt").assert(TEXT);
 }
 
@@ -189,7 +196,7 @@ fn delete_nobackup() {
         inp.save().unwrap();
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
-    p.assert(swapcase(TEXT));
+    p.assert(SWAPPED_TEXT);
 }
 
 // Cannot delete open files on Windows
@@ -279,7 +286,7 @@ fn overwrite_backup() {
         inp.save().unwrap();
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "file.txt"]);
-    p.assert(swapcase(TEXT));
+    p.assert(SWAPPED_TEXT);
     bkp.assert(TEXT);
 }
 
@@ -327,7 +334,7 @@ fn prechdir_backup() {
         inp.save().unwrap();
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "file.txt"]);
-    p.assert(swapcase(TEXT));
+    p.assert(SWAPPED_TEXT);
     tmpdir.child("backup.txt").assert(TEXT);
 }
 
@@ -357,7 +364,7 @@ fn postchdir_backup() {
     }
     assert!(listdir(&wrongdir).unwrap().is_empty());
     assert_eq!(listdir(&filedir).unwrap(), ["backup.txt", "file.txt"]);
-    p.assert(swapcase(TEXT));
+    p.assert(SWAPPED_TEXT);
     filedir.child("backup.txt").assert(TEXT);
 }
 
@@ -385,7 +392,7 @@ fn different_dir_backup() {
     }
     assert_eq!(listdir(&filedir).unwrap(), ["file.txt"]);
     assert_eq!(listdir(&bkpdir).unwrap(), ["backup.txt"]);
-    p.assert(swapcase(TEXT));
+    p.assert(SWAPPED_TEXT);
     bkpdir.child("backup.txt").assert(TEXT);
 }
 
@@ -414,7 +421,7 @@ fn different_dir_file_backup() {
     }
     assert_eq!(listdir(&filedir).unwrap(), ["file.txt"]);
     assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "filedir"]);
-    p.assert(swapcase(TEXT));
+    p.assert(SWAPPED_TEXT);
     tmpdir.child("backup.txt").assert(TEXT);
 }
 
@@ -515,8 +522,8 @@ fn symlink_nobackup() {
             assert_eq!(read_link(&link).unwrap(), Path::new("..\\real\\realfile.txt"));
         }
     }
-    real.assert(swapcase(TEXT));
-    link.assert(swapcase(TEXT));
+    real.assert(SWAPPED_TEXT);
+    link.assert(SWAPPED_TEXT);
 }
 
 #[test]
@@ -566,8 +573,8 @@ fn symlink_backup_ext() {
             assert_eq!(read_link(&link).unwrap(), Path::new("..\\real\\realfile.txt"));
         }
     }
-    real.assert(swapcase(TEXT));
-    link.assert(swapcase(TEXT));
+    real.assert(SWAPPED_TEXT);
+    link.assert(SWAPPED_TEXT);
     linkdir.child("linkfile.txt~").assert(TEXT);
 }
 
@@ -616,7 +623,7 @@ fn symlink_backup() {
             assert_eq!(read_link(&link).unwrap(), Path::new("..\\real\\realfile.txt"));
         }
     }
-    real.assert(swapcase(TEXT));
-    link.assert(swapcase(TEXT));
+    real.assert(SWAPPED_TEXT);
+    link.assert(SWAPPED_TEXT);
     tmpdir.child("backup.txt").assert(TEXT);
 }
