@@ -1,5 +1,5 @@
 use std::error;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use std::fmt;
 use std::fs::{metadata, rename, File};
 use std::io;
@@ -40,14 +40,13 @@ impl InPlace {
     pub fn open(&mut self) -> Result<InPlaceFile, OpenError> {
         let (path, backup_path) = if self.follow_symlinks {
             let backup_path = match self.backup.as_ref() {
-                Some(bkp) => match bkp.apply(&self.path) {
-                    Some(bp) => Some(absolutize(&bp)?),
-                    None => return Err(OpenError::backup_path()),
-                },
+                Some(bkp) => Some(absolutize(&bkp.apply(&self.path)?)?),
                 None => None,
             };
             (
                 self.path.canonicalize().map_err(OpenError::canonicalize)?,
+                // TODO: Should backup_path be canonicalized as well?  This
+                // would mean different behavior than current in_place.py.
                 backup_path,
             )
         } else {
@@ -75,19 +74,37 @@ pub enum Backup {
 }
 
 impl Backup {
-    fn apply(&self, path: &Path) -> Option<PathBuf> {
+    fn apply(&self, path: &Path) -> Result<PathBuf, OpenError> {
         match self {
-            // TODO: Canonicalize this:
-            Backup::Path(p) => Some(p.clone()),
+            Backup::Path(p) => {
+                if p == Path::new("") {
+                    Err(OpenError::empty_backup())
+                } else {
+                    Ok(p.clone())
+                }
+            }
             Backup::FileName(fname) => {
-                (fname != OsStr::new("")).then(|| path.with_file_name(fname))
+                if fname.is_empty() {
+                    Err(OpenError::empty_backup())
+                } else {
+                    Ok(path.with_file_name(fname))
+                }
             }
             Backup::AppendExtension(ext) => {
-                let mut fname = path.file_name()?.to_os_string();
-                fname.push(ext);
-                Some(path.with_file_name(&fname))
+                if ext.is_empty() {
+                    Err(OpenError::empty_backup())
+                } else {
+                    match path.file_name() {
+                        Some(fname) => {
+                            let mut fname = fname.to_os_string();
+                            fname.push(ext);
+                            Ok(path.with_file_name(&fname))
+                        }
+                        None => Err(OpenError::no_filename()),
+                    }
+                }
             }
-            Backup::SetExtension(ext) => Some(path.with_extension(ext)),
+            Backup::SetExtension(ext) => Ok(path.with_extension(ext)),
         }
     }
 }
@@ -161,36 +178,67 @@ impl OpenError {
         self.source
     }
 
-    fn get_metadata(_e: io::Error) -> OpenError {
-        todo!()
+    fn get_metadata(source: io::Error) -> OpenError {
+        OpenError {
+            kind: OpenErrorKind::GetMetadata,
+            source: Some(source),
+        }
     }
 
-    fn set_metadata(_e: io::Error) -> OpenError {
-        todo!()
+    fn set_metadata(source: io::Error) -> OpenError {
+        OpenError {
+            kind: OpenErrorKind::SetMetadata,
+            source: Some(source),
+        }
     }
 
     fn no_parent() -> OpenError {
-        todo!()
+        OpenError {
+            kind: OpenErrorKind::NoParent,
+            source: None,
+        }
     }
 
-    fn mktemp(_e: io::Error) -> OpenError {
-        todo!()
+    fn mktemp(source: io::Error) -> OpenError {
+        OpenError {
+            kind: OpenErrorKind::Mktemp,
+            source: Some(source),
+        }
     }
 
-    fn canonicalize(_e: io::Error) -> OpenError {
-        todo!()
+    fn canonicalize(source: io::Error) -> OpenError {
+        OpenError {
+            kind: OpenErrorKind::Canonicalize,
+            source: Some(source),
+        }
     }
 
-    fn cwd(_e: io::Error) -> OpenError {
-        todo!()
+    fn cwd(source: io::Error) -> OpenError {
+        OpenError {
+            kind: OpenErrorKind::CurrentDir,
+            source: Some(source),
+        }
     }
 
-    fn backup_path() -> OpenError {
-        todo!()
+    fn open(source: io::Error) -> OpenError {
+        OpenError {
+            kind: OpenErrorKind::Open,
+            source: Some(source),
+        }
     }
 
-    fn open(_e: io::Error) -> OpenError {
-        todo!()
+    fn empty_backup() -> OpenError {
+        OpenError {
+            kind: OpenErrorKind::EmptyBackup,
+            source: None,
+        }
+    }
+
+    fn no_filename() -> OpenError {
+        OpenError {
+            kind: OpenErrorKind::NoFilename,
+            source: None,
+        }
     }
 }
 
@@ -203,6 +251,39 @@ impl fmt::Display for OpenError {
 impl error::Error for OpenError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         self.source.as_ref().map(|e| e as &dyn error::Error)
+    }
+}
+
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum OpenErrorKind {
+    // Note that `Canonicalize` is the error kind encountered when the input
+    // path doesn't exist.
+    Canonicalize,
+    CurrentDir,
+    EmptyBackup,
+    GetMetadata,
+    Mktemp,
+    NoFilename,
+    NoParent,
+    Open,
+    SetMetadata,
+}
+
+impl OpenErrorKind {
+    fn message(&self) -> &'static str {
+        use OpenErrorKind::*;
+        match self {
+            Canonicalize => "failed to canonicalize path",
+            CurrentDir => "failed to fetch current directory",
+            EmptyBackup => "backup path or extension is empty",
+            GetMetadata => "failed to get metadata for path",
+            Mktemp => "failed to create temporary file",
+            NoFilename => "path does not have a filename",
+            NoParent => "path does not have a parent directory",
+            Open => "failed to open path for reading",
+            SetMetadata => "failed to set metadata on tempory file",
+        }
     }
 }
 
@@ -279,15 +360,6 @@ impl fmt::Display for DiscardError {
 impl error::Error for DiscardError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         Some(&self.source)
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct OpenErrorKind;
-
-impl OpenErrorKind {
-    fn message(&self) -> &'static str {
-        todo!()
     }
 }
 

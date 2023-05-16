@@ -154,19 +154,21 @@ fn backup_path() {
     tmpdir.child("backup.txt").assert(TEXT);
 }
 
-/* TODO:
 #[test]
 fn test_empty_backup_ext() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
-    let r = InPlace::new(&p).backup(Backup::AppendExtension("".into())).open();
+    let r = InPlace::new(&p)
+        .backup(Backup::AppendExtension("".into()))
+        .open();
     assert!(r.is_err());
-    // Make more assertions about `r`
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::EmptyBackup);
+    assert_eq!(e.to_string(), "backup path or extension is empty");
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     p.assert(TEXT);
 }
-*/
 
 #[test]
 fn nop_nobackup() {
@@ -482,7 +484,9 @@ fn edit_nonexistent() {
     let p = tmpdir.child("file.txt");
     let r = InPlace::new(p).open();
     assert!(r.is_err());
-    // TODO: Make more assertions about `r`
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::Canonicalize);
+    assert_eq!(e.to_string(), "failed to canonicalize path");
     assert!(listdir(&tmpdir).unwrap().is_empty());
 }
 
