@@ -1,10 +1,13 @@
 #![allow(dead_code)]
+use std::error;
 use std::ffi::{OsStr, OsString};
+use std::fmt;
 use std::fs::File;
 use std::io::{
     self, BufRead, BufReader, BufWriter, IoSlice, IoSliceMut, Read, Seek, SeekFrom, Write,
 };
 use std::path::{Path, PathBuf};
+use tempfile::NamedTempFile;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InPlace {
@@ -75,15 +78,35 @@ impl Backup {
 }
 
 #[derive(Debug)]
-pub struct InPlaceFile;
+pub struct InPlaceFile {
+    reader: InPlaceReader,
+    writer: InPlaceWriter,
+    path: PathBuf,
+    backup_path: Option<PathBuf>,
+    tmpfile: NamedTempFile,
+}
 
 impl InPlaceFile {
     pub fn reader(&mut self) -> &mut InPlaceReader {
-        todo!()
+        &mut self.reader
     }
 
     pub fn writer(&mut self) -> &mut InPlaceWriter {
-        todo!()
+        &mut self.writer
+    }
+
+    // Returns the path to the file that was opened for in-place editing
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn backup_path(&self) -> Option<&Path> {
+        self.backup_path.as_deref()
+    }
+
+    // TODO: Is this a good idea?
+    pub fn temp_path(&self) -> &Path {
+        self.tmpfile.path()
     }
 
     pub fn save(self) -> Result<(), SaveError> {
@@ -210,11 +233,125 @@ impl Seek for InPlaceWriter {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct OpenError;
+#[derive(Debug)]
+pub struct OpenError {
+    kind: OpenErrorKind,
+    source: Option<io::Error>,
+}
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SaveError;
+impl OpenError {
+    pub fn kind(&self) -> OpenErrorKind {
+        self.kind
+    }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DiscardError;
+    pub fn as_io_error(&self) -> Option<&io::Error> {
+        self.source.as_ref()
+    }
+
+    pub fn into_io_error(self) -> Option<io::Error> {
+        self.source
+    }
+}
+
+#[derive(Debug)]
+pub struct SaveError {
+    kind: SaveErrorKind,
+    source: io::Error,
+}
+
+impl SaveError {
+    pub fn kind(&self) -> SaveErrorKind {
+        self.kind
+    }
+
+    pub fn as_io_error(&self) -> &io::Error {
+        &self.source
+    }
+
+    pub fn into_io_error(self) -> io::Error {
+        self.source
+    }
+}
+
+impl fmt::Display for OpenError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.kind.message())
+    }
+}
+
+impl error::Error for OpenError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        self.source.as_ref().map(|e| e as &dyn error::Error)
+    }
+}
+
+#[derive(Debug)]
+pub struct DiscardError {
+    kind: DiscardErrorKind,
+    source: io::Error,
+}
+
+impl fmt::Display for SaveError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.kind.message())
+    }
+}
+
+impl error::Error for SaveError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+impl DiscardError {
+    pub fn kind(&self) -> DiscardErrorKind {
+        self.kind
+    }
+
+    pub fn as_io_error(&self) -> &io::Error {
+        &self.source
+    }
+
+    pub fn into_io_error(self) -> io::Error {
+        self.source
+    }
+}
+
+impl fmt::Display for DiscardError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.kind.message())
+    }
+}
+
+impl error::Error for DiscardError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct OpenErrorKind;
+
+impl OpenErrorKind {
+    fn message(&self) -> &'static str {
+        todo!()
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct SaveErrorKind;
+
+impl SaveErrorKind {
+    fn message(&self) -> &'static str {
+        todo!()
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct DiscardErrorKind;
+
+impl DiscardErrorKind {
+    fn message(&self) -> &'static str {
+        todo!()
+    }
+}
