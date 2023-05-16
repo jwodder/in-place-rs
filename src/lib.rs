@@ -254,7 +254,7 @@ impl error::Error for OpenError {
     }
 }
 
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum OpenErrorKind {
     // Note that `Canonicalize` is the error kind encountered when the input
@@ -333,7 +333,7 @@ impl error::Error for SaveError {
     }
 }
 
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum SaveErrorKind {
     PersistTemp,
@@ -369,8 +369,11 @@ impl DiscardError {
         self.source
     }
 
-    fn rmtemp(_e: io::Error) -> DiscardError {
-        todo!()
+    fn rmtemp(source: io::Error) -> DiscardError {
+        DiscardError {
+            kind: DiscardErrorKind::Rmtemp,
+            source,
+        }
     }
 }
 
@@ -386,12 +389,17 @@ impl error::Error for DiscardError {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct DiscardErrorKind;
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum DiscardErrorKind {
+    Rmtemp,
+}
 
 impl DiscardErrorKind {
     fn message(&self) -> &'static str {
-        todo!()
+        match self {
+            DiscardErrorKind::Rmtemp => "failed to delete temporary file",
+        }
     }
 }
 
