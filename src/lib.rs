@@ -2,12 +2,12 @@
 use std::error;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
-use std::fs::File;
+use std::fs::{metadata, rename, File};
 use std::io::{
     self, BufRead, BufReader, BufWriter, IoSlice, IoSliceMut, Read, Seek, SeekFrom, Write,
 };
 use std::path::{Path, PathBuf};
-use tempfile::NamedTempFile;
+use tempfile::{Builder, NamedTempFile, PersistError};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InPlace {
@@ -48,7 +48,32 @@ impl InPlace {
     }
 
     pub fn open(&mut self) -> Result<InPlaceFile, OpenError> {
-        todo!()
+        let path = if self.follow_symlinks {
+            todo!()
+        } else {
+            self.path.canonicalize().map_err(OpenError::canonicalize)?
+        };
+        if self.move_first {
+            todo!()
+        } else {
+            let backup_path = match self.backup.as_ref() {
+                Some(bkp) => match bkp.apply(&path) {
+                    Some(bp) => Some(bp),
+                    None => return Err(OpenError::backup_path()),
+                },
+                None => None,
+            };
+            // TODO: Check that `path` and `backup_path` are not the same file
+            let tmpfile = mktemp(&path)?;
+            copystats(&path, tmpfile.as_file())?;
+            let input = File::open(&path).map_err(OpenError::open)?;
+            Ok(InPlaceFile {
+                reader: InPlaceReader::new(input, path.clone()),
+                writer: InPlaceWriter::new(tmpfile),
+                path,
+                backup_path,
+            })
+        }
     }
 }
 
@@ -63,6 +88,7 @@ pub enum Backup {
 impl Backup {
     fn apply(&self, path: &Path) -> Option<PathBuf> {
         match self {
+            // TODO: Canonicalize this:
             Backup::Path(p) => Some(p.clone()),
             Backup::FileName(fname) => {
                 (fname != OsStr::new("")).then(|| path.with_file_name(fname))
@@ -83,7 +109,6 @@ pub struct InPlaceFile {
     writer: InPlaceWriter,
     path: PathBuf,
     backup_path: Option<PathBuf>,
-    tmpfile: NamedTempFile,
 }
 
 impl InPlaceFile {
@@ -105,16 +130,33 @@ impl InPlaceFile {
     }
 
     // TODO: Is this a good idea?
-    pub fn temp_path(&self) -> &Path {
-        self.tmpfile.path()
-    }
+    //pub fn temp_path(&self) -> &Path {
+    //    self.tmpfile.path()
+    //}
 
-    pub fn save(self) -> Result<(), SaveError> {
-        todo!()
+    pub fn save(mut self) -> Result<(), SaveError> {
+        let _ = self.writer().flush();
+        if let Some(bp) = self.backup_path.as_ref() {
+            rename(&self.path, bp).map_err(SaveError::backup)?;
+        }
+        let r = self
+            .writer
+            .into_tempfile()
+            .map_err(SaveError::into_tempfile)
+            .and_then(|tmpfile| tmpfile.persist(&self.path).map_err(SaveError::persist));
+        if r.is_err() {
+            if let Some(bp) = self.backup_path.as_ref() {
+                let _ = rename(bp, &self.path);
+            }
+        }
+        r.map(|_| ())
     }
 
     pub fn discard(self) -> Result<(), DiscardError> {
-        todo!()
+        self.writer
+            .into_tempfile()
+            .map_err(DiscardError::into_tempfile)
+            .and_then(|tmpfile| tmpfile.close().map_err(DiscardError::rmtemp))
     }
 }
 
@@ -132,6 +174,13 @@ pub struct InPlaceReader {
 }
 
 impl InPlaceReader {
+    fn new(file: File, path: PathBuf) -> Self {
+        Self {
+            inner: BufReader::new(file),
+            path,
+        }
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -145,7 +194,6 @@ impl InPlaceReader {
     }
 }
 
-// TODO: Add wrappers for nightly-only methods that BufReader defines as well
 impl Read for InPlaceReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
@@ -189,47 +237,51 @@ impl Seek for InPlaceReader {
 }
 
 #[derive(Debug)]
-pub struct InPlaceWriter {
-    inner: BufWriter<File>,
-    path: PathBuf,
-}
+pub struct InPlaceWriter(BufWriter<NamedTempFile>);
 
 impl InPlaceWriter {
+    fn new(file: NamedTempFile) -> Self {
+        InPlaceWriter(BufWriter::new(file))
+    }
+
+    fn into_tempfile(self) -> Result<NamedTempFile, io::IntoInnerError<BufWriter<NamedTempFile>>> {
+        self.0.into_inner()
+    }
+
     pub fn path(&self) -> &Path {
-        &self.path
+        self.0.get_ref().path()
     }
 
     pub fn as_file(&self) -> &File {
-        self.inner.get_ref()
+        self.0.get_ref().as_file()
     }
 
     pub fn as_mut_file(&mut self) -> &mut File {
-        self.inner.get_mut()
+        self.0.get_mut().as_file_mut()
     }
 }
 
-// TODO: Add wrappers for nightly-only methods that BufWriter defines as well
 impl Write for InPlaceWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.write(buf)
+        self.0.write(buf)
     }
 
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.inner.write_all(buf)
+        self.0.write_all(buf)
     }
 
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.inner.write_vectored(bufs)
+        self.0.write_vectored(bufs)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
+        self.0.flush()
     }
 }
 
 impl Seek for InPlaceWriter {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        self.inner.seek(pos)
+        self.0.seek(pos)
     }
 }
 
@@ -251,6 +303,46 @@ impl OpenError {
     pub fn into_io_error(self) -> Option<io::Error> {
         self.source
     }
+
+    fn get_metadata(_e: io::Error) -> OpenError {
+        todo!()
+    }
+
+    fn set_metadata(_e: io::Error) -> OpenError {
+        todo!()
+    }
+
+    fn no_parent() -> OpenError {
+        todo!()
+    }
+
+    fn mktemp(_e: io::Error) -> OpenError {
+        todo!()
+    }
+
+    fn canonicalize(_e: io::Error) -> OpenError {
+        todo!()
+    }
+
+    fn backup_path() -> OpenError {
+        todo!()
+    }
+
+    fn open(_e: io::Error) -> OpenError {
+        todo!()
+    }
+}
+
+impl fmt::Display for OpenError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.kind.message())
+    }
+}
+
+impl error::Error for OpenError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        self.source.as_ref().map(|e| e as &dyn error::Error)
+    }
 }
 
 #[derive(Debug)]
@@ -271,24 +363,18 @@ impl SaveError {
     pub fn into_io_error(self) -> io::Error {
         self.source
     }
-}
 
-impl fmt::Display for OpenError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.kind.message())
+    fn backup(_e: io::Error) -> SaveError {
+        todo!()
     }
-}
 
-impl error::Error for OpenError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        self.source.as_ref().map(|e| e as &dyn error::Error)
+    fn persist(_e: PersistError) -> SaveError {
+        todo!()
     }
-}
 
-#[derive(Debug)]
-pub struct DiscardError {
-    kind: DiscardErrorKind,
-    source: io::Error,
+    fn into_tempfile(_e: io::IntoInnerError<BufWriter<NamedTempFile>>) -> SaveError {
+        todo!()
+    }
 }
 
 impl fmt::Display for SaveError {
@@ -303,6 +389,12 @@ impl error::Error for SaveError {
     }
 }
 
+#[derive(Debug)]
+pub struct DiscardError {
+    kind: DiscardErrorKind,
+    source: io::Error,
+}
+
 impl DiscardError {
     pub fn kind(&self) -> DiscardErrorKind {
         self.kind
@@ -314,6 +406,14 @@ impl DiscardError {
 
     pub fn into_io_error(self) -> io::Error {
         self.source
+    }
+
+    fn rmtemp(_e: io::Error) -> DiscardError {
+        todo!()
+    }
+
+    fn into_tempfile(_e: io::IntoInnerError<BufWriter<NamedTempFile>>) -> DiscardError {
+        todo!()
     }
 }
 
@@ -354,4 +454,23 @@ impl DiscardErrorKind {
     fn message(&self) -> &'static str {
         todo!()
     }
+}
+
+fn mktemp(filepath: &Path) -> Result<NamedTempFile, OpenError> {
+    let dirpath = filepath.parent().ok_or_else(OpenError::no_parent)?;
+    Builder::new()
+        .prefix("._in_place-")
+        .tempfile_in(dirpath)
+        .map_err(OpenError::mktemp)
+}
+
+fn copystats(src: &Path, dest: &File) -> Result<(), OpenError> {
+    // Don't bother with switching to symlink_metadata() when follow_symlinks
+    // is false, as it seems (based on Python's shutil.copystats()) that
+    // permissions can only be copied from a symlink if they're being copied to
+    // another symlink, which our temp files are not.
+    let perms = metadata(src)
+        .map_err(OpenError::get_metadata)?
+        .permissions();
+    dest.set_permissions(perms).map_err(OpenError::set_metadata)
 }
