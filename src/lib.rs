@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::error;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
@@ -104,27 +103,8 @@ pub struct InPlaceFile {
 }
 
 impl InPlaceFile {
-    /* // Consider removing these, as they can't be called while a mutable
-     * borrow on reader of writer is extant.
-    // Returns the path to the file that was opened for in-place editing
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    pub fn backup_path(&self) -> Option<&Path> {
-        self.backup_path.as_deref()
-    }
-    */
-
-    // TODO: Is this a good idea?
-    //pub fn temp_path(&self) -> &Path {
-    //    self.tmpfile.path()
-    //}
-
     pub fn save(mut self) -> Result<(), SaveError> {
         let _ = self.writer.flush();
-        dbg!(&self.path);
-        dbg!(&self.backup_path);
         if let Some(bp) = self.backup_path.as_ref() {
             rename(&self.path, bp).map_err(SaveError::backup)?;
         }

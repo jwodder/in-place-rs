@@ -148,11 +148,9 @@ fn test_empty_backup_ext() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
-    {
-        let r = InPlace::new(&p).backup(Backup::AppendExtension("".into())).open();
-        assert!(r.is_err());
-        // Make more assertions about `r`
-    }
+    let r = InPlace::new(&p).backup(Backup::AppendExtension("".into())).open();
+    assert!(r.is_err());
+    // Make more assertions about `r`
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     p.assert(TEXT);
 }
@@ -216,7 +214,7 @@ fn delete_backup() {
         }
         let r = inp.save();
         assert!(r.is_err());
-        // TODO: Assert more about r
+        // TODO: Make more assertions about `r`
     }
     assert!(listdir(&tmpdir).unwrap().is_empty());
 }
@@ -472,7 +470,7 @@ fn edit_nonexistent() {
     let p = tmpdir.child("file.txt");
     let r = InPlace::new(p).open();
     assert!(r.is_err());
-    // TODO: Assert more about `r`
+    // TODO: Make more assertions about `r`
     assert!(listdir(&tmpdir).unwrap().is_empty());
 }
 
