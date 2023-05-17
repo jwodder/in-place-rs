@@ -46,8 +46,8 @@ impl InPlace {
             };
             (
                 self.path.canonicalize().map_err(OpenError::canonicalize)?,
-                // TODO: Should backup_path be canonicalized as well?  This
-                // would mean different behavior than current in_place.py.
+                // Don't try to canonicalize backup_path, as it likely won't
+                // exist, which would lead to an error
                 backup_path,
             )
         } else {

@@ -1,18 +1,9 @@
 use super::*;
 use assert_fs::fixture::TempDir;
 use assert_fs::prelude::*;
-use cfg_if::cfg_if;
 use std::fs::{read_dir, read_link, remove_file};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use tmp_env::set_current_dir;
-
-cfg_if! {
-    if #[cfg(unix)] {
-        use std::os::unix::fs::symlink;
-    } else if #[cfg(windows)] {
-        use std::os::windows::fs::symlink_file;
-    }
-}
 
 static TEXT: &str = concat!(
     "'Twas brillig, and the slithy toves\n",
@@ -35,6 +26,25 @@ fn listdir(dirpath: &Path) -> io::Result<Vec<String>> {
     }
     files.sort();
     Ok(files)
+}
+
+#[cfg(unix)]
+fn mklink(target: &Path, link: &Path) -> io::Result<bool> {
+    std::os::unix::fs::symlink(target, link)?;
+    Ok(true)
+}
+
+#[cfg(windows)]
+fn mklink(target: &Path, link: &Path) -> io::Result<bool> {
+    // If this errors, assume symlinks aren't enabled for us on this system and
+    // skip the test
+    Ok(std::os::windows::fs::symlink_file(target, link).is_ok())
+}
+
+#[cfg(all(not(unix), not(windows)))]
+fn mklink(_: &Path, _: &Path) -> io::Result<bool> {
+    // Whatever this is, assume it doesn't have symlinks
+    Ok(false)
 }
 
 fn swapcase(s: &str) -> String {
@@ -555,17 +565,9 @@ fn symlink_nobackup() {
     linkdir.create_dir_all().unwrap();
     let link = linkdir.child("linkfile.txt");
     let target = PathBuf::from_iter(["..", "real", "realfile.txt"]);
-    cfg_if! {
-        if #[cfg(unix)] {
-            symlink(&target, &link).unwrap()
-        } else if #[cfg(windows)] {
-            if symlink_file(&target, &link).is_err() {
-                // Assume symlinks aren't enabled for us and skip the test
-                return;
-            }
-        } else {
-            return;
-        }
+    if !mklink(&target, &link).unwrap() {
+        // No symlinks; skip test
+        return;
     }
     {
         let inp = InPlace::new(&link).open().unwrap();
@@ -595,17 +597,9 @@ fn symlink_backup_ext() {
     linkdir.create_dir_all().unwrap();
     let link = linkdir.child("linkfile.txt");
     let target = PathBuf::from_iter(["..", "real", "realfile.txt"]);
-    cfg_if! {
-        if #[cfg(unix)] {
-            symlink(&target, &link).unwrap()
-        } else if #[cfg(windows)] {
-            if symlink_file(&target, &link).is_err() {
-                // Assume symlinks aren't enabled for us and skip the test
-                return;
-            }
-        } else {
-            return;
-        }
+    if !mklink(&target, &link).unwrap() {
+        // No symlinks; skip test
+        return;
     }
     {
         let inp = InPlace::new(&link)
@@ -642,17 +636,9 @@ fn symlink_backup() {
     linkdir.create_dir_all().unwrap();
     let link = linkdir.child("linkfile.txt");
     let target = PathBuf::from_iter(["..", "real", "realfile.txt"]);
-    cfg_if! {
-        if #[cfg(unix)] {
-            symlink(&target, &link).unwrap()
-        } else if #[cfg(windows)] {
-            if symlink_file(&target, &link).is_err() {
-                // Assume symlinks aren't enabled for us and skip the test
-                return;
-            }
-        } else {
-            return;
-        }
+    if !mklink(&target, &link).unwrap() {
+        // No symlinks; skip test
+        return;
     }
     {
         let inp = InPlace::new(&link)
