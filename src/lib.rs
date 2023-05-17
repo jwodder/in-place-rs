@@ -157,6 +157,11 @@ impl InPlace {
     ///   temporary file.
     ///
     /// - Open the edited path for reading.
+    ///
+    /// # Errors
+    ///
+    /// See the documentation for the variants of [`OpenErrorKind`] for the
+    /// operations & checks that this method can fail on.
     pub fn open(&mut self) -> Result<InPlaceFile, OpenError> {
         let path = if self.follow_symlinks {
             self.path.canonicalize().map_err(OpenError::canonicalize)?
@@ -284,6 +289,11 @@ impl InPlaceFile {
     /// - Persist the temporary file at the edited file's original location.
     ///   If this fails, and a backup path is set, try to move the backup back
     ///   to the original location, ignoring any errors.
+    ///
+    /// # Errors
+    ///
+    /// See the documentation for the variants of [`SaveErrorKind`] for the
+    /// operations that this method can fail on.
     pub fn save(self) -> Result<(), SaveError> {
         drop(self.reader);
         if let Some(bp) = self.backup_path.as_ref() {
@@ -301,6 +311,11 @@ impl InPlaceFile {
     }
 
     /// Close all filehandles and do not update or back up the edited file.
+    ///
+    /// # Errors
+    ///
+    /// See the documentation for the variants of [`DiscardErrorKind`] for the
+    /// operations that this method can fail on.
     pub fn discard(self) -> Result<(), DiscardError> {
         self.writer.close().map_err(DiscardError::rmtemp)
     }
