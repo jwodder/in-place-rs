@@ -99,20 +99,14 @@ impl Backup {
                     Ok(path.with_file_name(fname))
                 }
             }
-            Backup::AppendExtension(ext) => {
-                if ext.is_empty() {
-                    Err(OpenError::empty_backup())
-                } else {
-                    match path.file_name() {
-                        Some(fname) => {
-                            let mut fname = fname.to_os_string();
-                            fname.push(ext);
-                            Ok(path.with_file_name(&fname))
-                        }
-                        None => Err(OpenError::no_filename()),
-                    }
+            Backup::AppendExtension(ext) => match path.file_name() {
+                Some(fname) => {
+                    let mut fname = fname.to_os_string();
+                    fname.push(ext);
+                    Ok(path.with_file_name(&fname))
                 }
-            }
+                None => Err(OpenError::no_filename()),
+            },
             Backup::SetExtension(ext) => Ok(path.with_extension(ext)),
         }
     }

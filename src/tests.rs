@@ -174,8 +174,8 @@ fn append_empty_backup_ext() {
         .open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::EmptyBackup);
-    assert_eq!(e.to_string(), "backup path or extension is empty");
+    assert_eq!(e.kind(), OpenErrorKind::SameFile);
+    assert_eq!(e.to_string(), "path and backup path point to same file");
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     p.assert(TEXT);
 }
