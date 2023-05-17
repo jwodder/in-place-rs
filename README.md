@@ -67,3 +67,9 @@ let inp = InPlace::new("somefile.txt")
     .backup(in_place::Backup::Path("someotherfile.txt".into())
     .open()?;
 ```
+
+If you decide halfway through that you don't want to edit the file (say,
+because an unrecoverable error occurs), calling `inp.discard()` instead of
+`inp.save()` will close the filehandles and reset things to the way they were
+before.  Any changes are also discarded if `inp` is dropped without saving,
+except that in that case any errors are silently ignored.
