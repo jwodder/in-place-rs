@@ -140,7 +140,11 @@ impl InPlaceFile {
         }
         #[cfg(windows)]
         if self.backup_path.is_none() {
-            std::fs::remove_file(&self.path).map_err(SaveError::pre_persist)?;
+            match std::fs::remove_file(&self.path) {
+                Ok(()) => (),
+                Err(e) if e.kind() == io::ErrorKind::NotFound => (),
+                Err(e) => return Err(SaveError::pre_persist(e)),
+            }
         }
         let r = self.writer.persist(&self.path).map_err(SaveError::persist);
         if r.is_err() {
