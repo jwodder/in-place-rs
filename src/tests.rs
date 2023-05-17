@@ -971,3 +971,38 @@ fn no_parent() {
     assert_eq!(e.kind(), OpenErrorKind::NoParent);
     assert_eq!(e.to_string(), "path does not have a parent directory");
 }
+
+#[cfg(unix)]
+#[test]
+fn unwritable_dir() {
+    use std::fs::{set_permissions, Permissions};
+    use std::os::unix::fs::PermissionsExt;
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    set_permissions(tmpdir.path(), Permissions::from_mode(0o555)).unwrap();
+    let r = InPlace::new(&p).open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::Mktemp);
+    assert_eq!(e.to_string(), "failed to create temporary file");
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(TEXT);
+}
+
+#[cfg(unix)]
+#[test]
+fn unreadable_file() {
+    use std::fs::{set_permissions, Permissions};
+    use std::os::unix::fs::PermissionsExt;
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    set_permissions(p.path(), Permissions::from_mode(0o000)).unwrap();
+    let r = InPlace::new(&p).open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::Open);
+    assert_eq!(e.to_string(), "failed to open file for reading");
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+}
