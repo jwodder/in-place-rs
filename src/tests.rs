@@ -731,7 +731,7 @@ fn edit_nonexistent_nofollow() {
     assert!(r.is_err());
     let e = r.unwrap_err();
     assert_eq!(e.kind(), OpenErrorKind::GetMetadata);
-    assert_eq!(e.to_string(), "failed to get metadata for file");
+    assert_eq!(e.to_string(), "failed to get metadata for path");
     assert!(e.as_io_error().is_some());
     assert!(listdir(&tmpdir).unwrap().is_empty());
 }
