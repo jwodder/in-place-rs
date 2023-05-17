@@ -56,7 +56,7 @@ vowels to remain, you can instead save the file's original contents in, say,
 
 ```rust
 let inp = InPlace::new("somefile.txt")
-    .backup(in_place::Backup::AppendExtension("~".into())
+    .backup(in_place::Backup::Append("~".into())
     .open()?;
 ```
 

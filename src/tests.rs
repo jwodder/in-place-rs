@@ -106,7 +106,7 @@ fn backup_ext() {
     p.write_str(TEXT).unwrap();
     {
         let inp = InPlace::new(&p)
-            .backup(Backup::AppendExtension("~".into()))
+            .backup(Backup::Append("~".into()))
             .open()
             .unwrap();
         let reader = BufReader::new(inp.reader());
@@ -128,7 +128,7 @@ fn backup_set_ext() {
     p.write_str(TEXT).unwrap();
     {
         let inp = InPlace::new(&p)
-            .backup(Backup::SetExtension("bak".into()))
+            .backup(Backup::Extension("bak".into()))
             .open()
             .unwrap();
         let reader = BufReader::new(inp.reader());
@@ -222,7 +222,7 @@ fn append_empty_backup_ext() {
     p.write_str(TEXT).unwrap();
     {
         let inp = InPlace::new(&p)
-            .backup(Backup::AppendExtension("".into()))
+            .backup(Backup::Append("".into()))
             .open()
             .unwrap();
         let reader = BufReader::new(inp.reader());
@@ -243,7 +243,7 @@ fn set_same_backup_ext() {
     p.write_str(TEXT).unwrap();
     {
         let inp = InPlace::new(&p)
-            .backup(Backup::SetExtension("txt".into()))
+            .backup(Backup::Extension("txt".into()))
             .open()
             .unwrap();
         let reader = BufReader::new(inp.reader());
@@ -708,7 +708,7 @@ fn symlink_backup_ext() {
     }
     {
         let inp = InPlace::new(&linkfile)
-            .backup(Backup::AppendExtension("~".into()))
+            .backup(Backup::Append("~".into()))
             .open()
             .unwrap();
         let reader = BufReader::new(inp.reader());
@@ -826,7 +826,7 @@ fn no_follow_symlink_backup_ext() {
     }
     {
         let inp = InPlace::new(&linkfile)
-            .backup(Backup::AppendExtension("~".into()))
+            .backup(Backup::Append("~".into()))
             .follow_symlinks(false)
             .open()
             .unwrap();

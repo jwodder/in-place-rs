@@ -65,8 +65,8 @@ impl InPlace {
 pub enum Backup {
     Path(PathBuf),
     FileName(OsString),
-    AppendExtension(OsString),
-    SetExtension(OsString),
+    Extension(OsString),
+    Append(OsString),
 }
 
 impl Backup {
@@ -86,7 +86,8 @@ impl Backup {
                     Ok(path.with_file_name(fname))
                 }
             }
-            Backup::AppendExtension(ext) => match path.file_name() {
+            Backup::Extension(ext) => Ok(path.with_extension(ext)),
+            Backup::Append(ext) => match path.file_name() {
                 Some(fname) => {
                     let mut fname = fname.to_os_string();
                     fname.push(ext);
@@ -94,7 +95,6 @@ impl Backup {
                 }
                 None => Err(OpenError::no_filename()),
             },
-            Backup::SetExtension(ext) => Ok(path.with_extension(ext)),
         }
     }
 }
