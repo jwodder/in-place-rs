@@ -1202,3 +1202,49 @@ fn broken_symlink_nofollow() {
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     assert_eq!(read_link(&p).unwrap(), target);
 }
+
+#[cfg(unix)]
+#[test]
+fn copy_executable_perm() {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    fs::set_permissions(&p, PermissionsExt::from_mode(0o755)).unwrap();
+    {
+        let inp = InPlace::new(&p).open().unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(SWAPPED_TEXT);
+    let md = fs::metadata(&p).unwrap();
+    assert_eq!(md.mode() & 0o777, 0o755);
+}
+
+#[cfg(unix)]
+#[test]
+fn nofollow_copy_executable_perm() {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    fs::set_permissions(&p, PermissionsExt::from_mode(0o755)).unwrap();
+    {
+        let inp = InPlace::new(&p).follow_symlinks(false).open().unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(SWAPPED_TEXT);
+    let md = fs::metadata(&p).unwrap();
+    assert_eq!(md.mode() & 0o777, 0o755);
+}
