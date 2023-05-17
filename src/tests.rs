@@ -220,15 +220,20 @@ fn append_empty_backup_ext() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
-    let r = InPlace::new(&p)
-        .backup(Backup::AppendExtension("".into()))
-        .open();
-    assert!(r.is_err());
-    let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::SameFile);
-    assert_eq!(e.to_string(), "path and backup path point to same file");
+    {
+        let inp = InPlace::new(&p)
+            .backup(Backup::AppendExtension("".into()))
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
-    p.assert(TEXT);
+    p.assert(SWAPPED_TEXT);
 }
 
 #[test]
@@ -236,15 +241,20 @@ fn set_same_backup_ext() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
-    let r = InPlace::new(&p)
-        .backup(Backup::SetExtension("txt".into()))
-        .open();
-    assert!(r.is_err());
-    let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::SameFile);
-    assert_eq!(e.to_string(), "path and backup path point to same file");
+    {
+        let inp = InPlace::new(&p)
+            .backup(Backup::SetExtension("txt".into()))
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
-    p.assert(TEXT);
+    p.assert(SWAPPED_TEXT);
 }
 
 #[test]
@@ -252,15 +262,20 @@ fn same_backup_filename() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
-    let r = InPlace::new(&p)
-        .backup(Backup::FileName("file.txt".into()))
-        .open();
-    assert!(r.is_err());
-    let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::SameFile);
-    assert_eq!(e.to_string(), "path and backup path point to same file");
+    {
+        let inp = InPlace::new(&p)
+            .backup(Backup::FileName("file.txt".into()))
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
-    p.assert(TEXT);
+    p.assert(SWAPPED_TEXT);
 }
 
 #[test]
@@ -268,15 +283,20 @@ fn same_backup_path() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
-    let r = InPlace::new(&p)
-        .backup(Backup::Path(p.path().into()))
-        .open();
-    assert!(r.is_err());
-    let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::SameFile);
-    assert_eq!(e.to_string(), "path and backup path point to same file");
+    {
+        let inp = InPlace::new(&p)
+            .backup(Backup::Path(p.to_path_buf()))
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
-    p.assert(TEXT);
+    p.assert(SWAPPED_TEXT);
 }
 
 #[test]
@@ -1014,25 +1034,26 @@ fn file_links_to_backup() {
         // No symlinks; skip test
         return;
     }
-    let r = InPlace::new(&p)
-        .backup(Backup::Path(backup.to_path_buf()))
-        .open();
-    assert!(r.is_err());
-    let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::SameFile);
-    assert_eq!(e.to_string(), "path and backup path point to same file");
+    {
+        let inp = InPlace::new(&p)
+            .backup(Backup::Path(backup.to_path_buf()))
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
     assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "file.txt"]);
     assert!(p.is_symlink());
     assert_eq!(read_link(&p).unwrap(), target);
-    assert!(!backup.is_symlink());
-    backup.assert(TEXT);
+    backup.assert(SWAPPED_TEXT);
 }
 
 #[test]
-fn bug_file_links_to_backup_nofollow() {
-    // Bug: If the input path is a symlink to the backup path and
-    // `follow_links` is `false`, `same_file` will produce a SameFile error,
-    // even though without the check editing would work smoothly.
+fn file_links_to_backup_nofollow() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     let backup = tmpdir.child("backup.txt");
@@ -1042,26 +1063,28 @@ fn bug_file_links_to_backup_nofollow() {
         // No symlinks; skip test
         return;
     }
-    let r = InPlace::new(&p)
-        .backup(Backup::Path(backup.to_path_buf()))
-        .follow_symlinks(false)
-        .open();
-    assert!(r.is_err());
-    let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::SameFile);
-    assert_eq!(e.to_string(), "path and backup path point to same file");
+    {
+        let inp = InPlace::new(&p)
+            .backup(Backup::Path(backup.to_path_buf()))
+            .follow_symlinks(false)
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
     assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "file.txt"]);
-    assert!(p.is_symlink());
-    assert_eq!(read_link(&p).unwrap(), target);
-    assert!(!backup.is_symlink());
-    backup.assert(TEXT);
+    assert!(!p.is_symlink());
+    p.assert(SWAPPED_TEXT);
+    assert!(backup.is_symlink());
+    assert_eq!(read_link(&backup).unwrap(), target);
 }
 
 #[test]
-fn bug_backup_links_to_file() {
-    // Bug: If the backup path is a symlink to the input path, `same_file` will
-    // produce a SameFile error, even though without the check editing would
-    // work smoothly.
+fn backup_links_to_file() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
@@ -1071,17 +1094,22 @@ fn bug_backup_links_to_file() {
         // No symlinks; skip test
         return;
     }
-    let r = InPlace::new(&p)
-        .backup(Backup::Path(backup.to_path_buf()))
-        .follow_symlinks(false)
-        .open();
-    assert!(r.is_err());
-    let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::SameFile);
-    assert_eq!(e.to_string(), "path and backup path point to same file");
+    {
+        let inp = InPlace::new(&p)
+            .backup(Backup::Path(backup.to_path_buf()))
+            .follow_symlinks(false)
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
     assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "file.txt"]);
     assert!(!p.is_symlink());
-    p.assert(TEXT);
-    assert!(backup.is_symlink());
-    assert_eq!(read_link(&backup).unwrap(), target);
+    p.assert(SWAPPED_TEXT);
+    assert!(!backup.is_symlink());
+    backup.assert(TEXT);
 }

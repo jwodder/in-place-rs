@@ -12,7 +12,6 @@ categories = ["filesystem"]
 exclude = ["/.*", "!/.cargo/"]
 
 [dependencies]
-same-file = "1.0.6"
 tempfile = "3.5.0"
 
 [dev-dependencies]
