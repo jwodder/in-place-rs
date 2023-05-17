@@ -121,6 +121,28 @@ fn backup_ext() {
 }
 
 #[test]
+fn backup_set_ext() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    {
+        let inp = InPlace::new(&p)
+            .backup(Backup::SetExtension("bak".into()))
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.bak", "file.txt"]);
+    p.assert(SWAPPED_TEXT);
+    tmpdir.child("file.bak").assert(TEXT);
+}
+
+#[test]
 fn backup_filename() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
