@@ -187,6 +187,34 @@ fn backup_path() {
 }
 
 #[test]
+fn empty_backup_path() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    let r = InPlace::new(&p).backup(Backup::Path("".into())).open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::EmptyBackup);
+    assert_eq!(e.to_string(), "backup path is empty");
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(TEXT);
+}
+
+#[test]
+fn empty_backup_filename() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    let r = InPlace::new(&p).backup(Backup::FileName("".into())).open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::EmptyBackup);
+    assert_eq!(e.to_string(), "backup path is empty");
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(TEXT);
+}
+
+#[test]
 fn append_empty_backup_ext() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");

@@ -277,7 +277,7 @@ impl OpenErrorKind {
         match self {
             Canonicalize => "failed to canonicalize path",
             CurrentDir => "failed to fetch current directory",
-            EmptyBackup => "backup path or extension is empty",
+            EmptyBackup => "backup path is empty",
             GetMetadata => "failed to get metadata for file",
             Mktemp => "failed to create temporary file",
             NoFilename => "path does not have a filename",
