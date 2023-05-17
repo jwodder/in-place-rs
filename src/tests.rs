@@ -67,6 +67,8 @@ fn nobackup() {
     p.write_str(TEXT).unwrap();
     {
         let inp = InPlace::new(&p).open().unwrap();
+        assert_eq!(inp.path(), p.canonicalize().unwrap());
+        assert_eq!(inp.backup_path(), None);
         let reader = BufReader::new(inp.reader());
         let mut writer = inp.writer();
         for line in reader.lines() {
@@ -153,6 +155,10 @@ fn backup_filename() {
             .backup(Backup::FileName("backup.txt".into()))
             .open()
             .unwrap();
+        assert_eq!(
+            inp.backup_path().unwrap(),
+            p.canonicalize().unwrap().with_file_name("backup.txt"),
+        );
         let reader = BufReader::new(inp.reader());
         let mut writer = inp.writer();
         for line in reader.lines() {
@@ -188,6 +194,28 @@ fn backup_path() {
 }
 
 #[test]
+fn backup_nobackup() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    {
+        let inp = InPlace::new(&p)
+            .backup(Backup::FileName("backup.txt".into()))
+            .no_backup()
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(SWAPPED_TEXT);
+}
+
+#[test]
 fn empty_backup_path() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
@@ -197,6 +225,7 @@ fn empty_backup_path() {
     let e = r.unwrap_err();
     assert_eq!(e.kind(), OpenErrorKind::EmptyBackup);
     assert_eq!(e.to_string(), "backup path is empty");
+    assert!(e.as_io_error().is_none());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     p.assert(TEXT);
 }
@@ -211,6 +240,7 @@ fn empty_backup_filename() {
     let e = r.unwrap_err();
     assert_eq!(e.kind(), OpenErrorKind::EmptyBackup);
     assert_eq!(e.to_string(), "backup path is empty");
+    assert!(e.as_io_error().is_none());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     p.assert(TEXT);
 }
@@ -497,6 +527,8 @@ fn prechdir_backup() {
             .backup(Backup::Path("backup.txt".into()))
             .open()
             .unwrap();
+        assert_eq!(inp.path(), p.canonicalize().unwrap());
+        assert!(inp.backup_path().unwrap().is_absolute());
         let reader = BufReader::new(inp.reader());
         let mut writer = inp.writer();
         for line in reader.lines() {
@@ -525,6 +557,38 @@ fn postchdir_backup() {
             .backup(Backup::Path("backup.txt".into()))
             .open()
             .unwrap();
+        let _chdir = set_current_dir(&wrongdir);
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert!(listdir(&wrongdir).unwrap().is_empty());
+    assert_eq!(listdir(&filedir).unwrap(), ["backup.txt", "file.txt"]);
+    p.assert(SWAPPED_TEXT);
+    filedir.child("backup.txt").assert(TEXT);
+}
+
+#[test]
+fn postchdir_backup_nofollow() {
+    let tmpdir = TempDir::new().unwrap();
+    let filedir = tmpdir.child("filedir");
+    filedir.create_dir_all().unwrap();
+    let wrongdir = tmpdir.child("wrongdir");
+    wrongdir.create_dir_all().unwrap();
+    let p = filedir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    let _chdir = set_current_dir(&filedir);
+    {
+        let inp = InPlace::new("file.txt")
+            .backup(Backup::Path("backup.txt".into()))
+            .follow_symlinks(false)
+            .open()
+            .unwrap();
+        assert!(inp.path().is_absolute());
+        assert!(inp.backup_path().unwrap().is_absolute());
         let _chdir = set_current_dir(&wrongdir);
         let reader = BufReader::new(inp.reader());
         let mut writer = inp.writer();
@@ -655,6 +719,7 @@ fn edit_nonexistent() {
     let e = r.unwrap_err();
     assert_eq!(e.kind(), OpenErrorKind::Canonicalize);
     assert_eq!(e.to_string(), "failed to canonicalize path");
+    assert!(e.as_io_error().is_some());
     assert!(listdir(&tmpdir).unwrap().is_empty());
 }
 
@@ -667,6 +732,7 @@ fn edit_nonexistent_nofollow() {
     let e = r.unwrap_err();
     assert_eq!(e.kind(), OpenErrorKind::GetMetadata);
     assert_eq!(e.to_string(), "failed to get metadata for file");
+    assert!(e.as_io_error().is_some());
     assert!(listdir(&tmpdir).unwrap().is_empty());
 }
 
@@ -998,6 +1064,7 @@ fn no_parent() {
     let e = r.unwrap_err();
     assert_eq!(e.kind(), OpenErrorKind::NoParent);
     assert_eq!(e.to_string(), "path does not have a parent directory");
+    assert!(e.as_io_error().is_none());
 }
 
 #[cfg(unix)]
@@ -1014,6 +1081,7 @@ fn unwritable_dir() {
     let e = r.unwrap_err();
     assert_eq!(e.kind(), OpenErrorKind::Mktemp);
     assert_eq!(e.to_string(), "failed to create temporary file");
+    assert!(e.as_io_error().is_some());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     p.assert(TEXT);
 }
@@ -1032,6 +1100,7 @@ fn unreadable_file() {
     let e = r.unwrap_err();
     assert_eq!(e.kind(), OpenErrorKind::Open);
     assert_eq!(e.to_string(), "failed to open file for reading");
+    assert!(e.as_io_error().is_some());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
 }
 
@@ -1185,6 +1254,7 @@ fn broken_symlink() {
     let e = r.unwrap_err();
     assert_eq!(e.kind(), OpenErrorKind::Canonicalize);
     assert_eq!(e.to_string(), "failed to canonicalize path");
+    assert!(e.as_io_error().is_some());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     assert_eq!(read_link(&p).unwrap(), target);
 }
@@ -1203,6 +1273,7 @@ fn broken_symlink_nofollow() {
     let e = r.unwrap_err();
     assert_eq!(e.kind(), OpenErrorKind::Open);
     assert_eq!(e.to_string(), "failed to open file for reading");
+    assert!(e.as_io_error().is_some());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     assert_eq!(read_link(&p).unwrap(), target);
 }
@@ -1251,4 +1322,20 @@ fn nofollow_copy_executable_perm() {
     p.assert(SWAPPED_TEXT);
     let md = fs::metadata(&p).unwrap();
     assert_eq!(md.mode() & 0o777, 0o755);
+}
+
+#[test]
+fn append_no_filename_nofollow() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("..");
+    let r = InPlace::new(p)
+        .backup(Backup::Append("/foo".into()))
+        .follow_symlinks(false)
+        .open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::NoFilename);
+    assert_eq!(e.to_string(), "path does not have a filename");
+    assert!(e.as_io_error().is_none());
+    assert!(listdir(&tmpdir).unwrap().is_empty());
 }
