@@ -1006,3 +1006,86 @@ fn unreadable_file() {
     assert_eq!(e.to_string(), "failed to open file for reading");
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
 }
+
+#[test]
+fn file_links_to_backup() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    let backup = tmpdir.child("backup.txt");
+    backup.write_str(TEXT).unwrap();
+    let target = Path::new("backup.txt");
+    if !mklink(target, &p).unwrap() {
+        // No symlinks; skip test
+        return;
+    }
+    let r = InPlace::new(&p)
+        .backup(Backup::Path(backup.to_path_buf()))
+        .open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::SameFile);
+    assert_eq!(e.to_string(), "path and backup path point to same file");
+    assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "file.txt"]);
+    assert!(p.is_symlink());
+    assert_eq!(read_link(&p).unwrap(), target);
+    assert!(!backup.is_symlink());
+    backup.assert(TEXT);
+}
+
+#[test]
+fn bug_file_links_to_backup_nofollow() {
+    // Bug: If the input path is a symlink to the backup path and
+    // `follow_links` is `false`, `same_file` will produce a SameFile error,
+    // even though without the check editing would work smoothly.
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    let backup = tmpdir.child("backup.txt");
+    backup.write_str(TEXT).unwrap();
+    let target = Path::new("backup.txt");
+    if !mklink(target, &p).unwrap() {
+        // No symlinks; skip test
+        return;
+    }
+    let r = InPlace::new(&p)
+        .backup(Backup::Path(backup.to_path_buf()))
+        .follow_symlinks(false)
+        .open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::SameFile);
+    assert_eq!(e.to_string(), "path and backup path point to same file");
+    assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "file.txt"]);
+    assert!(p.is_symlink());
+    assert_eq!(read_link(&p).unwrap(), target);
+    assert!(!backup.is_symlink());
+    backup.assert(TEXT);
+}
+
+#[test]
+fn bug_backup_links_to_file() {
+    // Bug: If the backup path is a symlink to the input path, `same_file` will
+    // produce a SameFile error, even though without the check editing would
+    // work smoothly.
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    let backup = tmpdir.child("backup.txt");
+    let target = Path::new("file.txt");
+    if !mklink(target, &backup).unwrap() {
+        // No symlinks; skip test
+        return;
+    }
+    let r = InPlace::new(&p)
+        .backup(Backup::Path(backup.to_path_buf()))
+        .follow_symlinks(false)
+        .open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::SameFile);
+    assert_eq!(e.to_string(), "path and backup path point to same file");
+    assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "file.txt"]);
+    assert!(!p.is_symlink());
+    p.assert(TEXT);
+    assert!(backup.is_symlink());
+    assert_eq!(read_link(&backup).unwrap(), target);
+}
