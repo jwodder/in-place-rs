@@ -333,6 +333,43 @@ fn discard_backup() {
 }
 
 #[test]
+fn drop_nobackup() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    {
+        let inp = InPlace::new(&p).open().unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(TEXT);
+}
+
+#[test]
+fn drop_backup() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    {
+        let inp = InPlace::new(&p)
+            .backup(Backup::FileName("backup.txt".into()))
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(TEXT);
+}
+
+#[test]
 fn overwrite_backup() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");

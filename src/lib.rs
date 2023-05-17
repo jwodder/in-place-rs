@@ -161,13 +161,6 @@ impl InPlaceFile {
     }
 }
 
-// TODO:
-//impl Drop for InPlaceFile {
-//    fn drop(&mut self) {
-//       // discard() and ignore error
-//    }
-//}
-
 #[derive(Debug)]
 pub struct OpenError {
     kind: OpenErrorKind,
