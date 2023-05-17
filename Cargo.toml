@@ -2,15 +2,13 @@
 name = "in-place"
 version = "0.1.0-dev"
 edition = "2021"
-# TODO: Verify this and that it can't be lower:
-rust-version = "1.65"
+rust-version = "1.60"
 description = "In-place file processing"
 authors = ["John Thorvald Wodder II <in-place-rs@varonathe.org>"]
 repository = "https://github.com/jwodder/in-place-rs"
 license = "MIT"
-keywords = []
-# See <https://crates.io/category_slugs> for a list of categories
-categories = []
+keywords = ["edit", "in-place", "tempfile"]
+categories = ["filesystem"]
 exclude = ["/.*", "!/.cargo/"]
 
 [dependencies]
