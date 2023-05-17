@@ -155,7 +155,7 @@ fn backup_path() {
 }
 
 #[test]
-fn test_empty_backup_ext() {
+fn append_empty_backup_ext() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
@@ -166,6 +166,54 @@ fn test_empty_backup_ext() {
     let e = r.unwrap_err();
     assert_eq!(e.kind(), OpenErrorKind::EmptyBackup);
     assert_eq!(e.to_string(), "backup path or extension is empty");
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(TEXT);
+}
+
+#[test]
+fn set_same_backup_ext() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    let r = InPlace::new(&p)
+        .backup(Backup::SetExtension("txt".into()))
+        .open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::SameFile);
+    assert_eq!(e.to_string(), "path and backup path point to same file");
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(TEXT);
+}
+
+#[test]
+fn same_backup_filename() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    let r = InPlace::new(&p)
+        .backup(Backup::FileName("file.txt".into()))
+        .open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::SameFile);
+    assert_eq!(e.to_string(), "path and backup path point to same file");
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(TEXT);
+}
+
+#[test]
+fn same_backup_path() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    let r = InPlace::new(&p)
+        .backup(Backup::Path(p.path().into()))
+        .open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::SameFile);
+    assert_eq!(e.to_string(), "path and backup path point to same file");
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     p.assert(TEXT);
 }

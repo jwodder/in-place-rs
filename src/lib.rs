@@ -1,3 +1,4 @@
+use same_file::is_same_file;
 use std::error;
 use std::ffi::OsString;
 use std::fmt;
@@ -52,7 +53,15 @@ impl InPlace {
         } else {
             todo!()
         };
-        // TODO: Check that `path` and `backup_path` are not the same file
+        if let Some(bkp) = backup_path.as_ref() {
+            if is_same_file(&path, bkp).unwrap_or(false) {
+                // If an error occurs, it's because either the backup path
+                // doesn't exist (and thus can't equal `path`) or there was an
+                // error opening `path` (and thus we can wait for opening
+                // `reader` lower down to fail).
+                return Err(OpenError::same_file());
+            }
+        }
         let writer = mktemp(&path)?;
         copystats(&path, writer.as_file())?;
         let reader = File::open(&path).map_err(OpenError::open)?;
@@ -240,6 +249,13 @@ impl OpenError {
             source: None,
         }
     }
+
+    fn same_file() -> OpenError {
+        OpenError {
+            kind: OpenErrorKind::SameFile,
+            source: None,
+        }
+    }
 }
 
 impl fmt::Display for OpenError {
@@ -267,6 +283,7 @@ pub enum OpenErrorKind {
     NoFilename,
     NoParent,
     Open,
+    SameFile,
     SetMetadata,
 }
 
@@ -282,6 +299,7 @@ impl OpenErrorKind {
             NoFilename => "path does not have a filename",
             NoParent => "path does not have a parent directory",
             Open => "failed to open file for reading",
+            SameFile => "path and backup path point to same file",
             SetMetadata => "failed to set metadata on temporary file",
         }
     }
