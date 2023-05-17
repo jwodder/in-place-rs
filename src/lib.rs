@@ -40,16 +40,14 @@ impl InPlace {
 
     pub fn open(&mut self) -> Result<InPlaceFile, OpenError> {
         let (path, backup_path) = if self.follow_symlinks {
+            let path = self.path.canonicalize().map_err(OpenError::canonicalize)?;
+            // Don't try to canonicalize backup_path, as it likely won't exist,
+            // which would lead to an error
             let backup_path = match self.backup.as_ref() {
-                Some(bkp) => Some(absolutize(&bkp.apply(&self.path)?)?),
+                Some(bkp) => Some(absolutize(&bkp.apply(&path)?)?),
                 None => None,
             };
-            (
-                self.path.canonicalize().map_err(OpenError::canonicalize)?,
-                // Don't try to canonicalize backup_path, as it likely won't
-                // exist, which would lead to an error
-                backup_path,
-            )
+            (path, backup_path)
         } else {
             todo!()
         };

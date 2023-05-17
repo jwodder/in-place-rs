@@ -651,18 +651,18 @@ fn symlink_backup_ext() {
         }
         inp.save().unwrap();
     }
-    assert_eq!(listdir(&realdir).unwrap(), ["realfile.txt"]);
+    assert_eq!(
+        listdir(&realdir).unwrap(),
+        ["realfile.txt", "realfile.txt~"]
+    );
     assert!(!realfile.is_symlink());
     realfile.assert(SWAPPED_TEXT);
-    assert_eq!(
-        listdir(&linkdir).unwrap(),
-        ["linkfile.txt", "linkfile.txt~"]
-    );
+    assert!(!realdir.child("realfile.txt~").is_symlink());
+    realdir.child("realfile.txt~").assert(TEXT);
+    assert_eq!(listdir(&linkdir).unwrap(), ["linkfile.txt"]);
     assert!(linkfile.is_symlink());
     assert_eq!(read_link(&linkfile).unwrap(), target);
     linkfile.assert(SWAPPED_TEXT);
-    assert!(!linkdir.child("linkfile.txt~").is_symlink());
-    linkdir.child("linkfile.txt~").assert(TEXT);
 }
 
 #[test]
