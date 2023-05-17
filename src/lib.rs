@@ -244,10 +244,12 @@ impl error::Error for OpenError {
 #[non_exhaustive]
 pub enum OpenErrorKind {
     // Note that `Canonicalize` is the error kind encountered when the input
-    // path doesn't exist.
+    // path doesn't exist and follow_symlinks is true.
     Canonicalize,
     CurrentDir,
     EmptyBackup,
+    // Note that `GetMetadata` is the error kind encountered when the input
+    // path doesn't exist and follow_symlinks is false.
     GetMetadata,
     Mktemp,
     NoFilename,

@@ -659,6 +659,18 @@ fn edit_nonexistent() {
 }
 
 #[test]
+fn edit_nonexistent_nofollow() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    let r = InPlace::new(p).follow_symlinks(false).open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::GetMetadata);
+    assert_eq!(e.to_string(), "failed to get metadata for file");
+    assert!(listdir(&tmpdir).unwrap().is_empty());
+}
+
+#[test]
 fn symlink_nobackup() {
     let tmpdir = TempDir::new().unwrap();
     let realdir = tmpdir.child("realdir");
