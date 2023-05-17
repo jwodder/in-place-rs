@@ -706,3 +706,121 @@ fn symlink_backup() {
     assert!(!tmpdir.child("backup.txt").is_symlink());
     tmpdir.child("backup.txt").assert(TEXT);
 }
+
+#[test]
+fn no_follow_symlink_nobackup() {
+    let tmpdir = TempDir::new().unwrap();
+    let realdir = tmpdir.child("realdir");
+    realdir.create_dir_all().unwrap();
+    let realfile = realdir.child("realfile.txt");
+    realfile.write_str(TEXT).unwrap();
+    let linkdir = tmpdir.child("linkdir");
+    linkdir.create_dir_all().unwrap();
+    let linkfile = linkdir.child("linkfile.txt");
+    let target = PathBuf::from_iter(["..", "realdir", "realfile.txt"]);
+    if !mklink(&target, &linkfile).unwrap() {
+        // No symlinks; skip test
+        return;
+    }
+    {
+        let inp = InPlace::new(&linkfile)
+            .follow_symlinks(false)
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&realdir).unwrap(), ["realfile.txt"]);
+    assert_eq!(listdir(&linkdir).unwrap(), ["linkfile.txt"]);
+    assert!(!realfile.is_symlink());
+    realfile.assert(TEXT);
+    assert!(!linkfile.is_symlink());
+    linkfile.assert(SWAPPED_TEXT);
+}
+
+#[test]
+fn no_follow_symlink_backup_ext() {
+    let tmpdir = TempDir::new().unwrap();
+    let realdir = tmpdir.child("realdir");
+    realdir.create_dir_all().unwrap();
+    let realfile = realdir.child("realfile.txt");
+    realfile.write_str(TEXT).unwrap();
+    let linkdir = tmpdir.child("linkdir");
+    linkdir.create_dir_all().unwrap();
+    let linkfile = linkdir.child("linkfile.txt");
+    let target = PathBuf::from_iter(["..", "realdir", "realfile.txt"]);
+    if !mklink(&target, &linkfile).unwrap() {
+        // No symlinks; skip test
+        return;
+    }
+    {
+        let inp = InPlace::new(&linkfile)
+            .backup(Backup::AppendExtension("~".into()))
+            .follow_symlinks(false)
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&realdir).unwrap(), ["realfile.txt"]);
+    assert!(!realfile.is_symlink());
+    realfile.assert(TEXT);
+    assert_eq!(
+        listdir(&linkdir).unwrap(),
+        ["linkfile.txt", "linkfile.txt~"]
+    );
+    assert!(!linkfile.is_symlink());
+    linkfile.assert(SWAPPED_TEXT);
+    assert!(linkdir.child("linkfile.txt~").is_symlink());
+    assert_eq!(read_link(linkdir.child("linkfile.txt~")).unwrap(), target);
+}
+
+#[test]
+fn no_follow_symlink_backup() {
+    let tmpdir = TempDir::new().unwrap();
+    let realdir = tmpdir.child("realdir");
+    realdir.create_dir_all().unwrap();
+    let realfile = realdir.child("realfile.txt");
+    realfile.write_str(TEXT).unwrap();
+    let linkdir = tmpdir.child("linkdir");
+    linkdir.create_dir_all().unwrap();
+    let linkfile = linkdir.child("linkfile.txt");
+    let target = PathBuf::from_iter(["..", "realdir", "realfile.txt"]);
+    if !mklink(&target, &linkfile).unwrap() {
+        // No symlinks; skip test
+        return;
+    }
+    {
+        let inp = InPlace::new(&linkfile)
+            .backup(Backup::Path(tmpdir.child("backup.txt").path().into()))
+            .follow_symlinks(false)
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert_eq!(
+        listdir(&tmpdir).unwrap(),
+        ["backup.txt", "linkdir", "realdir"]
+    );
+    assert_eq!(listdir(&realdir).unwrap(), ["realfile.txt"]);
+    assert!(!realfile.is_symlink());
+    realfile.assert(TEXT);
+    assert_eq!(listdir(&linkdir).unwrap(), ["linkfile.txt"]);
+    assert!(!linkfile.is_symlink());
+    linkfile.assert(SWAPPED_TEXT);
+    assert!(tmpdir.child("backup.txt").is_symlink());
+    assert_eq!(read_link(tmpdir.child("backup.txt")).unwrap(), target);
+}
