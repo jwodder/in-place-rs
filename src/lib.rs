@@ -1,7 +1,7 @@
 use std::error;
 use std::ffi::OsString;
 use std::fmt;
-use std::fs::{metadata, rename, File};
+use std::fs::{metadata, rename, symlink_metadata, File};
 use std::io;
 use std::path::{Path, PathBuf};
 use tempfile::{Builder, NamedTempFile, PersistError};
@@ -50,7 +50,7 @@ impl InPlace {
             None => None,
         };
         let writer = mktemp(&path)?;
-        copystats(&path, writer.as_file())?;
+        copystats(&path, writer.as_file(), self.follow_symlinks)?;
         let reader = File::open(&path).map_err(OpenError::open)?;
         Ok(InPlaceFile {
             reader,
@@ -408,15 +408,18 @@ fn mktemp(filepath: &Path) -> Result<NamedTempFile, OpenError> {
         .map_err(OpenError::mktemp)
 }
 
-fn copystats(src: &Path, dest: &File) -> Result<(), OpenError> {
-    // Don't bother with switching to symlink_metadata() when follow_symlinks
-    // is false, as it seems (based on Python's shutil.copystats()) that
-    // permissions can only be copied from a symlink if they're being copied to
-    // another symlink, which our temp files are not.
-    let perms = metadata(src)
-        .map_err(OpenError::get_metadata)?
-        .permissions();
-    dest.set_permissions(perms).map_err(OpenError::set_metadata)
+fn copystats(src: &Path, dest: &File, follow_symlinks: bool) -> Result<(), OpenError> {
+    let md = if follow_symlinks {
+        metadata(src)
+    } else {
+        symlink_metadata(src)
+    }
+    .map_err(OpenError::get_metadata)?;
+    if !md.is_symlink() {
+        dest.set_permissions(md.permissions())
+            .map_err(OpenError::set_metadata)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 use super::*;
 use assert_fs::fixture::TempDir;
 use assert_fs::prelude::*;
-use std::fs::{read_dir, read_link, remove_file};
+use std::fs::{self, read_dir, read_link, remove_file};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::Component;
 use tmp_env::set_current_dir;
@@ -1124,4 +1124,81 @@ fn backup_links_to_file() {
     p.assert(SWAPPED_TEXT);
     assert!(!backup.is_symlink());
     backup.assert(TEXT);
+}
+
+#[cfg(unix)]
+#[test]
+fn nofollow_nocopy_symlink_perms() {
+    use std::os::unix::fs::MetadataExt;
+    let tmpdir = TempDir::new().unwrap();
+    let realdir = tmpdir.child("realdir");
+    realdir.create_dir_all().unwrap();
+    let realfile = realdir.child("realfile.txt");
+    realfile.write_str(TEXT).unwrap();
+    let linkdir = tmpdir.child("linkdir");
+    linkdir.create_dir_all().unwrap();
+    let linkfile = linkdir.child("linkfile.txt");
+    let target = PathBuf::from_iter(["..", "realdir", "realfile.txt"]);
+    if !mklink(&target, &linkfile).unwrap() {
+        // No symlinks; skip test
+        return;
+    }
+    let md = fs::symlink_metadata(&linkfile).unwrap();
+    assert_eq!(md.mode() & 0o777, 0o755);
+    {
+        let inp = InPlace::new(&linkfile)
+            .follow_symlinks(false)
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&realdir).unwrap(), ["realfile.txt"]);
+    assert_eq!(listdir(&linkdir).unwrap(), ["linkfile.txt"]);
+    assert!(!realfile.is_symlink());
+    realfile.assert(TEXT);
+    assert!(!linkfile.is_symlink());
+    linkfile.assert(SWAPPED_TEXT);
+    let md = fs::symlink_metadata(&linkfile).unwrap();
+    assert_ne!(md.mode() & 0o777, 0o755);
+}
+
+#[test]
+fn broken_symlink() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    let target = PathBuf::from("nowhere.txt");
+    if !mklink(&target, &p).unwrap() {
+        // No symlinks; skip test
+        return;
+    }
+    let r = InPlace::new(&p).open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::Canonicalize);
+    assert_eq!(e.to_string(), "failed to canonicalize path");
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    assert_eq!(read_link(&p).unwrap(), target);
+}
+
+#[test]
+fn broken_symlink_nofollow() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    let target = PathBuf::from("nowhere.txt");
+    if !mklink(&target, &p).unwrap() {
+        // No symlinks; skip test
+        return;
+    }
+    let r = InPlace::new(&p).follow_symlinks(false).open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::Open);
+    assert_eq!(e.to_string(), "failed to open file for reading");
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    assert_eq!(read_link(&p).unwrap(), target);
 }
