@@ -1144,7 +1144,11 @@ fn nofollow_nocopy_symlink_perms() {
         return;
     }
     let md = fs::symlink_metadata(&linkfile).unwrap();
-    assert_eq!(md.mode() & 0o777, 0o755);
+    let mode = md.mode() & 0o777;
+    // It seems that different OSes (and/or filesystems?) give symlinks
+    // different permissions.  On macOS, they are 0755, but on Linux they are
+    // 0777.  Thus, we sanity-check for the common denominator of the two.
+    assert_eq!(mode & 0o755, 0o755);
     {
         let inp = InPlace::new(&linkfile)
             .follow_symlinks(false)
@@ -1164,7 +1168,7 @@ fn nofollow_nocopy_symlink_perms() {
     assert!(!linkfile.is_symlink());
     linkfile.assert(SWAPPED_TEXT);
     let md = fs::symlink_metadata(&linkfile).unwrap();
-    assert_ne!(md.mode() & 0o777, 0o755);
+    assert_ne!(md.mode(), mode);
 }
 
 #[test]
