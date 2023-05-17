@@ -139,13 +139,15 @@ impl InPlaceFile {
         if let Some(bp) = self.backup_path.as_ref() {
             rename(&self.path, bp).map_err(SaveError::save_backup)?;
         }
-        let r = self.writer.persist(&self.path).map_err(SaveError::persist);
-        if r.is_err() {
-            if let Some(bp) = self.backup_path.as_ref() {
-                let _ = rename(bp, &self.path);
+        match self.writer.persist(&self.path) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                if let Some(bp) = self.backup_path.as_ref() {
+                    let _ = rename(bp, &self.path);
+                }
+                Err(SaveError::persist(e))
             }
         }
-        r.map(|_| ())
     }
 
     pub fn discard(self) -> Result<(), DiscardError> {
