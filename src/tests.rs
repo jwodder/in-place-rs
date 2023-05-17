@@ -477,7 +477,7 @@ fn prechdir_backup() {
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
     {
-        let inp = InPlace::new(&p)
+        let inp = InPlace::new("file.txt")
             .backup(Backup::Path("backup.txt".into()))
             .open()
             .unwrap();
