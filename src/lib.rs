@@ -135,16 +135,9 @@ impl InPlaceFile {
     }
 
     pub fn save(self) -> Result<(), SaveError> {
+        drop(self.reader);
         if let Some(bp) = self.backup_path.as_ref() {
             rename(&self.path, bp).map_err(SaveError::save_backup)?;
-        }
-        #[cfg(windows)]
-        if self.backup_path.is_none() {
-            match std::fs::remove_file(&self.path) {
-                Ok(()) => (),
-                Err(e) if e.kind() == io::ErrorKind::NotFound => (),
-                Err(e) => return Err(SaveError::pre_persist(e)),
-            }
         }
         let r = self.writer.persist(&self.path).map_err(SaveError::persist);
         if r.is_err() {
@@ -323,14 +316,6 @@ impl SaveError {
         }
     }
 
-    #[cfg(windows)]
-    fn pre_persist(source: io::Error) -> SaveError {
-        SaveError {
-            kind: SaveErrorKind::Rmpath,
-            source,
-        }
-    }
-
     fn persist(source: PersistError) -> SaveError {
         SaveError {
             kind: SaveErrorKind::PersistTemp,
@@ -355,8 +340,6 @@ impl error::Error for SaveError {
 #[non_exhaustive]
 pub enum SaveErrorKind {
     PersistTemp,
-    // This only occurs on Windows
-    Rmpath,
     SaveBackup,
 }
 
@@ -365,7 +348,6 @@ impl SaveErrorKind {
         use SaveErrorKind::*;
         match self {
             PersistTemp => "failed to save temporary file at path",
-            Rmpath => "failed to remove file",
             SaveBackup => "failed to move file to backup path",
         }
     }
