@@ -3,6 +3,7 @@ use assert_fs::fixture::TempDir;
 use assert_fs::prelude::*;
 use std::fs::{read_dir, read_link, remove_file};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
+use std::path::Component;
 use tmp_env::set_current_dir;
 
 static TEXT: &str = concat!(
@@ -960,4 +961,13 @@ fn backup_is_symlink_nofollow() {
     assert_eq!(listdir(&linkdir).unwrap(), ["linkfile.txt"]);
     assert!(!linkfile.is_symlink());
     linkfile.assert(TEXT);
+}
+
+#[test]
+fn no_parent() {
+    let r = InPlace::new(PathBuf::from_iter([Component::RootDir])).open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::NoParent);
+    assert_eq!(e.to_string(), "path does not have a parent directory");
 }
