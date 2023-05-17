@@ -2,7 +2,7 @@
 name = "in-place"
 version = "0.1.0-dev"
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.65"
 description = "In-place file processing"
 authors = ["John Thorvald Wodder II <in-place-rs@varonathe.org>"]
 repository = "https://github.com/jwodder/in-place-rs"
