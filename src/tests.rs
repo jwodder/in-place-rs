@@ -292,8 +292,6 @@ fn nop_nobackup() {
     p.assert("");
 }
 
-// Cannot delete open files on Windows
-#[cfg(not(windows))]
 #[test]
 fn delete_nobackup() {
     let tmpdir = TempDir::new().unwrap();
@@ -306,7 +304,7 @@ fn delete_nobackup() {
         for (i, line) in reader.lines().enumerate() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
             if i == 2 {
-                remove_file(&p).unwrap();
+                remove_file(inp.path()).unwrap();
             }
         }
         inp.save().unwrap();
@@ -315,8 +313,6 @@ fn delete_nobackup() {
     p.assert(SWAPPED_TEXT);
 }
 
-// Cannot delete open files on Windows
-#[cfg(not(windows))]
 #[test]
 fn delete_backup() {
     let tmpdir = TempDir::new().unwrap();
@@ -332,7 +328,7 @@ fn delete_backup() {
         for (i, line) in reader.lines().enumerate() {
             writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
             if i == 2 {
-                remove_file(&p).unwrap();
+                remove_file(inp.path()).unwrap();
             }
         }
         let r = inp.save();
