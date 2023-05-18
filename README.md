@@ -1,10 +1,10 @@
-[![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 [![CI Status](https://github.com/jwodder/in-place-rs/actions/workflows/test.yml/badge.svg)](https://github.com/jwodder/in-place-rs/actions/workflows/test.yml)
 [![codecov.io](https://codecov.io/gh/jwodder/in-place-rs/branch/master/graph/badge.svg)](https://codecov.io/gh/jwodder/in-place-rs)
 [![Minimum Supported Rust Version](https://img.shields.io/badge/MSRV-1.65-orange)](https://www.rust-lang.org)
 [![MIT License](https://img.shields.io/github/license/jwodder/in-place-rs.svg)](https://opensource.org/licenses/MIT)
 
-[GitHub](https://github.com/jwodder/in-place-rs) | [Issues](https://github.com/jwodder/in-place-rs/issues)
+[GitHub](https://github.com/jwodder/in-place-rs) | [crates.io](https://crates.io/crates/in-place) | [Documentation](https://docs.rs/in-place) | [Issues](https://github.com/jwodder/in-place-rs/issues)
 
 The `in_place` library provides an `InPlace` type for reading & writing a file
 "in-place": data that you write ends up at the same filepath that you read
