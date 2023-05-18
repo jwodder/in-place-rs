@@ -250,20 +250,14 @@ fn append_empty_backup_ext() {
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
-    {
-        let inp = InPlace::new(&p)
-            .backup(Backup::Append("".into()))
-            .open()
-            .unwrap();
-        let reader = BufReader::new(inp.reader());
-        let mut writer = inp.writer();
-        for line in reader.lines() {
-            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
-        }
-        inp.save().unwrap();
-    }
+    let r = InPlace::new(&p).backup(Backup::Append("".into())).open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), OpenErrorKind::EmptyBackup);
+    assert_eq!(e.to_string(), "backup path is empty");
+    assert!(e.as_io_error().is_none());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
-    p.assert(SWAPPED_TEXT);
+    p.assert(TEXT);
 }
 
 #[test]

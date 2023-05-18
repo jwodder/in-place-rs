@@ -221,14 +221,20 @@ impl Backup {
                 }
             }
             Backup::Extension(ext) => Ok(path.with_extension(ext)),
-            Backup::Append(ext) => match path.file_name() {
-                Some(fname) => {
-                    let mut fname = fname.to_os_string();
-                    fname.push(ext);
-                    Ok(path.with_file_name(&fname))
+            Backup::Append(ext) => {
+                if ext.is_empty() {
+                    Err(OpenError::empty_backup())
+                } else {
+                    match path.file_name() {
+                        Some(fname) => {
+                            let mut fname = fname.to_os_string();
+                            fname.push(ext);
+                            Ok(path.with_file_name(&fname))
+                        }
+                        None => Err(OpenError::no_filename()),
+                    }
                 }
-                None => Err(OpenError::no_filename()),
-            },
+            }
         }
     }
 }
@@ -443,8 +449,8 @@ pub enum OpenErrorKind {
     /// Attemping to fetch the current directory failed
     CurrentDir,
 
-    /// The value within a [`Backup::Path`] or [`Backup::FileName`] backup
-    /// specifier was empty.
+    /// The value within a [`Backup::Path`], [`Backup::FileName`], or
+    /// [`Backup::Append`] backup specifier was empty.
     ///
     /// This error kind does not have a source error.
     EmptyBackup,
