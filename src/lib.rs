@@ -249,7 +249,7 @@ impl Backup {
 /// edited file unmodified.
 ///
 /// Dropping an `InPlaceFile` without calling `save()` has the same effect as
-/// calling `discard()`.
+/// calling `discard()`, except that any errors are ignored.
 #[derive(Debug)]
 pub struct InPlaceFile {
     reader: File,
