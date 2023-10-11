@@ -1172,6 +1172,36 @@ fn backup_links_to_file() {
     {
         let inp = InPlace::new(&p)
             .backup(Backup::Path(backup.to_path_buf()))
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        let mut writer = inp.writer();
+        for line in reader.lines() {
+            writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["backup.txt", "file.txt"]);
+    assert!(!p.is_symlink());
+    p.assert(SWAPPED_TEXT);
+    assert!(!backup.is_symlink());
+    backup.assert(TEXT);
+}
+
+#[test]
+fn backup_links_to_file_nofollow() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    let backup = tmpdir.child("backup.txt");
+    let target = Path::new("file.txt");
+    if !mklink(target, &backup).unwrap() {
+        // No symlinks; skip test
+        return;
+    }
+    {
+        let inp = InPlace::new(&p)
+            .backup(Backup::Path(backup.to_path_buf()))
             .follow_symlinks(false)
             .open()
             .unwrap();
