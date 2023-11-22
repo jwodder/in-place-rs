@@ -1,7 +1,7 @@
 use super::*;
 use assert_fs::fixture::TempDir;
 use assert_fs::prelude::*;
-use std::fs::{self, read_dir, read_link, remove_file};
+use std::fs::{read_dir, read_link, remove_file};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::Component;
 use tmp_env::set_current_dir;
@@ -1064,12 +1064,12 @@ fn no_parent() {
 #[cfg(unix)]
 #[test]
 fn unwritable_dir() {
-    use std::fs::{set_permissions, Permissions};
+    use std::fs::set_permissions;
     use std::os::unix::fs::PermissionsExt;
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
-    set_permissions(tmpdir.path(), Permissions::from_mode(0o555)).unwrap();
+    set_permissions(tmpdir.path(), PermissionsExt::from_mode(0o555)).unwrap();
     let r = InPlace::new(&p).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
@@ -1083,12 +1083,12 @@ fn unwritable_dir() {
 #[cfg(unix)]
 #[test]
 fn unreadable_file() {
-    use std::fs::{set_permissions, Permissions};
+    use std::fs::set_permissions;
     use std::os::unix::fs::PermissionsExt;
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
-    set_permissions(p.path(), Permissions::from_mode(0o000)).unwrap();
+    set_permissions(p.path(), PermissionsExt::from_mode(0o000)).unwrap();
     let r = InPlace::new(&p).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
@@ -1305,11 +1305,12 @@ fn broken_symlink_nofollow() {
 #[cfg(unix)]
 #[test]
 fn copy_executable_perm() {
+    use std::fs::set_permissions;
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
-    fs::set_permissions(&p, PermissionsExt::from_mode(0o755)).unwrap();
+    set_permissions(&p, PermissionsExt::from_mode(0o755)).unwrap();
     {
         let inp = InPlace::new(&p).open().unwrap();
         let reader = BufReader::new(inp.reader());
@@ -1328,11 +1329,12 @@ fn copy_executable_perm() {
 #[cfg(unix)]
 #[test]
 fn nofollow_copy_executable_perm() {
+    use std::fs::set_permissions;
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
     p.write_str(TEXT).unwrap();
-    fs::set_permissions(&p, PermissionsExt::from_mode(0o755)).unwrap();
+    set_permissions(&p, PermissionsExt::from_mode(0o755)).unwrap();
     {
         let inp = InPlace::new(&p).follow_symlinks(false).open().unwrap();
         let reader = BufReader::new(inp.reader());
