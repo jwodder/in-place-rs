@@ -1236,7 +1236,7 @@ fn nofollow_nocopy_symlink_perms() {
         // No symlinks; skip test
         return;
     }
-    let md = fs::symlink_metadata(&linkfile).unwrap();
+    let md = symlink_metadata(&linkfile).unwrap();
     let mode = md.mode() & 0o777;
     // It seems that different OSes (and/or filesystems?) give symlinks
     // different permissions.  On macOS, they are 0755, but on Linux they are
@@ -1260,7 +1260,7 @@ fn nofollow_nocopy_symlink_perms() {
     realfile.assert(TEXT);
     assert!(!linkfile.is_symlink());
     linkfile.assert(SWAPPED_TEXT);
-    let md = fs::symlink_metadata(&linkfile).unwrap();
+    let md = symlink_metadata(&linkfile).unwrap();
     assert_ne!(md.mode(), mode);
 }
 
@@ -1321,7 +1321,7 @@ fn copy_executable_perm() {
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     p.assert(SWAPPED_TEXT);
-    let md = fs::metadata(&p).unwrap();
+    let md = metadata(&p).unwrap();
     assert_eq!(md.mode() & 0o777, 0o755);
 }
 
@@ -1344,7 +1344,7 @@ fn nofollow_copy_executable_perm() {
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     p.assert(SWAPPED_TEXT);
-    let md = fs::metadata(&p).unwrap();
+    let md = metadata(&p).unwrap();
     assert_eq!(md.mode() & 0o777, 0o755);
 }
 

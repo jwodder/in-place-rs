@@ -424,14 +424,17 @@ impl OpenError {
 }
 
 impl fmt::Display for OpenError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.kind.message())
     }
 }
 
 impl error::Error for OpenError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        self.source.as_ref().map(|e| e as &dyn error::Error)
+        self.source.as_ref().map(|e| {
+            let e2: &dyn error::Error = e;
+            e2
+        })
     }
 }
 
@@ -541,7 +544,7 @@ impl SaveError {
 }
 
 impl fmt::Display for SaveError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.kind.message())
     }
 }
@@ -606,7 +609,7 @@ impl DiscardError {
 }
 
 impl fmt::Display for DiscardError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.kind.message())
     }
 }
