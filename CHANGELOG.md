@@ -1,5 +1,5 @@
-v0.2.0 (in development)
------------------------
+v0.2.0 (2023-12-22)
+-------------------
 - Increased MSRV to 1.70
 - **Breaking**: All error types have been combined into a single
   `InPlaceError`, and all error kinds have been combined into a single
