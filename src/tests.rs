@@ -223,7 +223,7 @@ fn empty_backup_path() {
     let r = InPlace::new(&p).backup(Backup::Path("".into())).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::EmptyBackup);
+    assert_eq!(e.kind(), InPlaceErrorKind::EmptyBackup);
     assert_eq!(e.to_string(), "backup path is empty");
     assert!(e.as_io_error().is_none());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
@@ -238,7 +238,7 @@ fn empty_backup_filename() {
     let r = InPlace::new(&p).backup(Backup::FileName("".into())).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::EmptyBackup);
+    assert_eq!(e.kind(), InPlaceErrorKind::EmptyBackup);
     assert_eq!(e.to_string(), "backup path is empty");
     assert!(e.as_io_error().is_none());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
@@ -253,7 +253,7 @@ fn append_empty_backup_ext() {
     let r = InPlace::new(&p).backup(Backup::Append("".into())).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::EmptyBackup);
+    assert_eq!(e.kind(), InPlaceErrorKind::EmptyBackup);
     assert_eq!(e.to_string(), "backup path is empty");
     assert!(e.as_io_error().is_none());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
@@ -378,7 +378,7 @@ fn delete_backup() {
         let r = inp.save();
         assert!(r.is_err());
         let e = r.unwrap_err();
-        assert_eq!(e.kind(), SaveErrorKind::SaveBackup);
+        assert_eq!(e.kind(), InPlaceErrorKind::SaveBackup);
         assert_eq!(e.to_string(), "failed to move file to backup path");
     }
     assert!(listdir(&tmpdir).unwrap().is_empty());
@@ -672,7 +672,7 @@ fn backup_dirpath() {
         let r = inp.save();
         assert!(r.is_err());
         let e = r.unwrap_err();
-        assert_eq!(e.kind(), SaveErrorKind::SaveBackup);
+        assert_eq!(e.kind(), InPlaceErrorKind::SaveBackup);
         assert_eq!(e.to_string(), "failed to move file to backup path");
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt", "not-a-file"]);
@@ -697,7 +697,7 @@ fn backup_nosuchdir() {
         let r = inp.save();
         assert!(r.is_err());
         let e = r.unwrap_err();
-        assert_eq!(e.kind(), SaveErrorKind::SaveBackup);
+        assert_eq!(e.kind(), InPlaceErrorKind::SaveBackup);
         assert_eq!(e.to_string(), "failed to move file to backup path");
     }
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
@@ -711,7 +711,7 @@ fn edit_nonexistent() {
     let r = InPlace::new(p).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::Canonicalize);
+    assert_eq!(e.kind(), InPlaceErrorKind::Canonicalize);
     assert_eq!(e.to_string(), "failed to canonicalize path");
     assert!(e.as_io_error().is_some());
     assert!(listdir(&tmpdir).unwrap().is_empty());
@@ -724,7 +724,7 @@ fn edit_nonexistent_nofollow() {
     let r = InPlace::new(p).follow_symlinks(false).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::GetMetadata);
+    assert_eq!(e.kind(), InPlaceErrorKind::GetMetadata);
     assert_eq!(e.to_string(), "failed to get metadata for path");
     assert!(e.as_io_error().is_some());
     assert!(listdir(&tmpdir).unwrap().is_empty());
@@ -1056,7 +1056,7 @@ fn no_parent() {
     let r = InPlace::new(PathBuf::from_iter([Component::RootDir])).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::NoParent);
+    assert_eq!(e.kind(), InPlaceErrorKind::NoParent);
     assert_eq!(e.to_string(), "path does not have a parent directory");
     assert!(e.as_io_error().is_none());
 }
@@ -1073,7 +1073,7 @@ fn unwritable_dir() {
     let r = InPlace::new(&p).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::Mktemp);
+    assert_eq!(e.kind(), InPlaceErrorKind::Mktemp);
     assert_eq!(e.to_string(), "failed to create temporary file");
     assert!(e.as_io_error().is_some());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
@@ -1092,7 +1092,7 @@ fn unreadable_file() {
     let r = InPlace::new(&p).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::Open);
+    assert_eq!(e.kind(), InPlaceErrorKind::Open);
     assert_eq!(e.to_string(), "failed to open file for reading");
     assert!(e.as_io_error().is_some());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
@@ -1276,7 +1276,7 @@ fn broken_symlink() {
     let r = InPlace::new(&p).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::Canonicalize);
+    assert_eq!(e.kind(), InPlaceErrorKind::Canonicalize);
     assert_eq!(e.to_string(), "failed to canonicalize path");
     assert!(e.as_io_error().is_some());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
@@ -1295,7 +1295,7 @@ fn broken_symlink_nofollow() {
     let r = InPlace::new(&p).follow_symlinks(false).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::Open);
+    assert_eq!(e.kind(), InPlaceErrorKind::Open);
     assert_eq!(e.to_string(), "failed to open file for reading");
     assert!(e.as_io_error().is_some());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
@@ -1360,7 +1360,7 @@ fn append_no_filename_nofollow() {
         .open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), OpenErrorKind::NoFilename);
+    assert_eq!(e.kind(), InPlaceErrorKind::NoFilename);
     assert_eq!(e.to_string(), "path does not have a filename");
     assert!(e.as_io_error().is_none());
     assert!(listdir(&tmpdir).unwrap().is_empty());
