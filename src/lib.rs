@@ -160,11 +160,13 @@ impl InPlace {
     ///
     /// # Errors
     ///
-    /// See the documentation for the variants of [`OpenErrorKind`] for the
+    /// See the documentation for the variants of [`InPlaceErrorKind`] for the
     /// operations & checks that this method can fail on.
-    pub fn open(&mut self) -> Result<InPlaceFile, OpenError> {
+    pub fn open(&mut self) -> Result<InPlaceFile, InPlaceError> {
         let path = if self.follow_symlinks {
-            self.path.canonicalize().map_err(OpenError::canonicalize)?
+            self.path
+                .canonicalize()
+                .map_err(InPlaceError::canonicalize)?
         } else {
             absolutize(&self.path)?
         };
@@ -176,7 +178,7 @@ impl InPlace {
         };
         let writer = mktemp(&path)?;
         copystats(&path, writer.as_file(), self.follow_symlinks)?;
-        let reader = File::open(&path).map_err(OpenError::open)?;
+        let reader = File::open(&path).map_err(InPlaceError::open)?;
         Ok(InPlaceFile {
             reader,
             writer,
@@ -204,18 +206,18 @@ pub enum Backup {
 }
 
 impl Backup {
-    fn apply(&self, path: &Path) -> Result<PathBuf, OpenError> {
+    fn apply(&self, path: &Path) -> Result<PathBuf, InPlaceError> {
         match self {
             Backup::Path(p) => {
                 if p == Path::new("") {
-                    Err(OpenError::empty_backup())
+                    Err(InPlaceError::empty_backup())
                 } else {
                     Ok(p.clone())
                 }
             }
             Backup::FileName(fname) => {
                 if fname.is_empty() {
-                    Err(OpenError::empty_backup())
+                    Err(InPlaceError::empty_backup())
                 } else {
                     Ok(path.with_file_name(fname))
                 }
@@ -223,7 +225,7 @@ impl Backup {
             Backup::Extension(ext) => Ok(path.with_extension(ext)),
             Backup::Append(ext) => {
                 if ext.is_empty() {
-                    Err(OpenError::empty_backup())
+                    Err(InPlaceError::empty_backup())
                 } else {
                     match path.file_name() {
                         Some(fname) => {
@@ -231,7 +233,7 @@ impl Backup {
                             fname.push(ext);
                             Ok(path.with_file_name(&fname))
                         }
-                        None => Err(OpenError::no_filename()),
+                        None => Err(InPlaceError::no_filename()),
                     }
                 }
             }
@@ -240,6 +242,8 @@ impl Backup {
 }
 
 /// A file that is currently being edited in-place.
+///
+/// An `InPlaceFile` instance can be obtained via [`InPlace::open()`].
 ///
 /// An `InPlaceFile` provides two file handles, one for reading the contents of
 /// the edited file and for writing its new contents.  In order to update the
@@ -298,12 +302,12 @@ impl InPlaceFile {
     ///
     /// # Errors
     ///
-    /// See the documentation for the variants of [`SaveErrorKind`] for the
+    /// See the documentation for the variants of [`InPlaceErrorKind`] for the
     /// operations that this method can fail on.
-    pub fn save(self) -> Result<(), SaveError> {
+    pub fn save(self) -> Result<(), InPlaceError> {
         drop(self.reader);
         if let Some(bp) = self.backup_path.as_ref() {
-            rename(&self.path, bp).map_err(SaveError::save_backup)?;
+            rename(&self.path, bp).map_err(InPlaceError::save_backup)?;
         }
         match self.writer.persist(&self.path) {
             Ok(_) => Ok(()),
@@ -311,7 +315,7 @@ impl InPlaceFile {
                 if let Some(bp) = self.backup_path.as_ref() {
                     let _ = rename(bp, &self.path);
                 }
-                Err(SaveError::persist(e))
+                Err(InPlaceError::persist(e))
             }
         }
     }
@@ -320,116 +324,138 @@ impl InPlaceFile {
     ///
     /// # Errors
     ///
-    /// See the documentation for the variants of [`DiscardErrorKind`] for the
+    /// See the documentation for the variants of [`InPlaceErrorKind`] for the
     /// operations that this method can fail on.
-    pub fn discard(self) -> Result<(), DiscardError> {
-        self.writer.close().map_err(DiscardError::rmtemp)
+    pub fn discard(self) -> Result<(), InPlaceError> {
+        self.writer.close().map_err(InPlaceError::rmtemp)
     }
 }
 
-/// An error that can occur while executing [`InPlace::open()`].
+/// An error that can occur while opening, saving, or discarding an
+/// [`InPlaceFile`].
 ///
 /// Some errors are caused by failed I/O operations, while others are responses
 /// to invalid paths or backup specifiers.  Only the first kind have source
-/// errors, available via [`OpenError::as_io_error()`] and
-/// [`OpenError::into_io_error()`] in addition to
+/// errors, available via [`InPlaceError::as_io_error()`] and
+/// [`InPlaceError::into_io_error()`] in addition to
 /// [`std::error::Error::source()`].
 #[derive(Debug)]
-pub struct OpenError {
-    kind: OpenErrorKind,
+pub struct InPlaceError {
+    kind: InPlaceErrorKind,
     source: Option<io::Error>,
 }
 
-impl OpenError {
+impl InPlaceError {
     /// Returns an enum value describing the operation or check that failed
-    pub fn kind(&self) -> OpenErrorKind {
+    pub fn kind(&self) -> InPlaceErrorKind {
         self.kind
     }
 
     /// Returns the [`std::io::Error`] that occurred, if any.  See the
-    /// documentation of [`OpenErrorKind`] to find out which error kinds have
-    /// source errors.
+    /// documentation of [`InPlaceErrorKind`] to find out which error kinds
+    /// have source errors.
     pub fn as_io_error(&self) -> Option<&io::Error> {
         self.source.as_ref()
     }
 
-    /// Consumes the [`OpenError`] and returns the inner [`std::io::Error`], if
-    /// any.
+    /// Consumes the [`InPlaceError`] and returns the inner [`std::io::Error`],
+    /// if any.
     pub fn into_io_error(self) -> Option<io::Error> {
         self.source
     }
 
-    fn get_metadata(source: io::Error) -> OpenError {
-        OpenError {
-            kind: OpenErrorKind::GetMetadata,
+    fn get_metadata(source: io::Error) -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::GetMetadata,
             source: Some(source),
         }
     }
 
-    fn set_metadata(source: io::Error) -> OpenError {
-        OpenError {
-            kind: OpenErrorKind::SetMetadata,
+    fn set_metadata(source: io::Error) -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::SetMetadata,
             source: Some(source),
         }
     }
 
-    fn no_parent() -> OpenError {
-        OpenError {
-            kind: OpenErrorKind::NoParent,
+    fn no_parent() -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::NoParent,
             source: None,
         }
     }
 
-    fn mktemp(source: io::Error) -> OpenError {
-        OpenError {
-            kind: OpenErrorKind::Mktemp,
+    fn mktemp(source: io::Error) -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::Mktemp,
             source: Some(source),
         }
     }
 
-    fn canonicalize(source: io::Error) -> OpenError {
-        OpenError {
-            kind: OpenErrorKind::Canonicalize,
+    fn canonicalize(source: io::Error) -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::Canonicalize,
             source: Some(source),
         }
     }
 
-    fn cwd(source: io::Error) -> OpenError {
-        OpenError {
-            kind: OpenErrorKind::CurrentDir,
+    fn cwd(source: io::Error) -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::CurrentDir,
             source: Some(source),
         }
     }
 
-    fn open(source: io::Error) -> OpenError {
-        OpenError {
-            kind: OpenErrorKind::Open,
+    fn open(source: io::Error) -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::Open,
             source: Some(source),
         }
     }
 
-    fn empty_backup() -> OpenError {
-        OpenError {
-            kind: OpenErrorKind::EmptyBackup,
+    fn empty_backup() -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::EmptyBackup,
             source: None,
         }
     }
 
-    fn no_filename() -> OpenError {
-        OpenError {
-            kind: OpenErrorKind::NoFilename,
+    fn no_filename() -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::NoFilename,
             source: None,
+        }
+    }
+
+    fn save_backup(source: io::Error) -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::SaveBackup,
+            source: Some(source),
+        }
+    }
+
+    fn persist(source: PersistError) -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::PersistTemp,
+            source: Some(source.error),
+        }
+    }
+
+    fn rmtemp(source: io::Error) -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::Rmtemp,
+            source: Some(source),
         }
     }
 }
 
-impl fmt::Display for OpenError {
+impl fmt::Display for InPlaceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.kind.message())
     }
 }
 
-impl error::Error for OpenError {
+impl error::Error for InPlaceError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         self.source.as_ref().map(|e| {
             let e2: &dyn error::Error = e;
@@ -438,59 +464,75 @@ impl error::Error for OpenError {
     }
 }
 
-/// An enumeration of the operations & checks that can fail when executing
-/// [`InPlace::open()`]
+/// An enumeration of the operations & checks that can fail while opening,
+/// saving, or discarding an [`InPlaceFile`].
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum OpenErrorKind {
-    /// Attempting to canonicalize the edited path failed.
+pub enum InPlaceErrorKind {
+    /// Returned by [`InPlace::open()`] if attempting to canonicalize the
+    /// edited path failed.
     ///
-    /// This is the error kind that occurs when the edited path does not exist
-    /// and `follow_symlinks` is true.
+    /// This error kind occurs when the edited path does not exist and
+    /// `follow_symlinks` is true.
     Canonicalize,
 
-    /// Attemping to fetch the current directory failed
+    /// Returned by [`InPlace::open()`] if attempting to fetch the current
+    /// directory failed
     CurrentDir,
 
-    /// The value within a [`Backup::Path`], [`Backup::FileName`], or
-    /// [`Backup::Append`] backup specifier was empty.
+    /// Returned by [`InPlace::open()`] if the value within a [`Backup::Path`],
+    /// [`Backup::FileName`], or [`Backup::Append`] backup specifier was empty.
     ///
     /// This error kind does not have a source error.
     EmptyBackup,
 
-    /// Attempting to fetch metadata & permission details about the edited file
-    /// failed.
+    /// Returned by [`InPlace::open()`] if attempting to fetch metadata &
+    /// permission details about the edited file failed.
     ///
-    /// This is the error kind that occurs when the edited path does not exist
-    /// and `follow_symlinks` is false.
+    /// This error kind occurs when the edited path does not exist and
+    /// `follow_symlinks` is false.
     GetMetadata,
 
-    /// Attempting to create the temporary file failed
+    /// Returned by [`InPlace::open()`] if attempting to create the temporary
+    /// file failed
     Mktemp,
 
-    /// A [`Backup::Append`] specifier was given, and [`Path::file_name`]
-    /// returned `None` for the edited path.
+    /// Returned by [`InPlace::open()`] if a [`Backup::Append`] specifier was
+    /// given and [`Path::file_name`] returned `None` for the edited path.
     ///
     /// This error kind does not have a source error.
     NoFilename,
 
-    /// [`Path::parent`] returned `None` for the edited path (after
-    /// canonicalization or absolutization).
+    /// Returned by [`InPlace::open()`] if [`Path::parent`] returned `None` for
+    /// the edited path (after canonicalization or absolutization).
     ///
     /// This error kind does not have a source error.
     NoParent,
 
-    /// Attempting to open the edited file for reading failed
+    /// Returned by [`InPlace::open()`] if attempting to open the edited file
+    /// for reading failed
     Open,
 
-    /// Attempting to copy the edited file's permissions to the temporary file
-    /// failed
+    /// Returned by [`InPlace::open()`] if attempting to copy the edited file's
+    /// permissions to the temporary file failed
     SetMetadata,
+
+    /// Returned by [`InPlaceFile::save()`] if attempting to persist the
+    /// temporary file at the edited path failed
+    PersistTemp,
+
+    /// Returned by [`InPlaceFile::save()`] if attempting to move the edited
+    /// file to the backup path failed
+    SaveBackup,
+
+    /// Returned by [`InPlaceFile::discard()`] if attempting to delete the
+    /// temporary file failed
+    Rmtemp,
 }
 
-impl OpenErrorKind {
+impl InPlaceErrorKind {
     fn message(&self) -> &'static str {
-        use OpenErrorKind::*;
+        use InPlaceErrorKind::*;
         match self {
             Canonicalize => "failed to canonicalize path",
             CurrentDir => "failed to fetch current directory",
@@ -501,169 +543,40 @@ impl OpenErrorKind {
             NoParent => "path does not have a parent directory",
             Open => "failed to open file for reading",
             SetMetadata => "failed to set metadata on temporary file",
-        }
-    }
-}
-
-/// An error that can occur while executing [`InPlaceFile::save()`]
-#[derive(Debug)]
-pub struct SaveError {
-    kind: SaveErrorKind,
-    source: io::Error,
-}
-
-impl SaveError {
-    /// Returns an enum value describing the operation that failed
-    pub fn kind(&self) -> SaveErrorKind {
-        self.kind
-    }
-
-    /// Returns the [`std::io::Error`] that occurred
-    pub fn as_io_error(&self) -> &io::Error {
-        &self.source
-    }
-
-    /// Consumes the [`SaveError`] and returns the inner [`std::io::Error`]
-    pub fn into_io_error(self) -> io::Error {
-        self.source
-    }
-
-    fn save_backup(source: io::Error) -> SaveError {
-        SaveError {
-            kind: SaveErrorKind::SaveBackup,
-            source,
-        }
-    }
-
-    fn persist(source: PersistError) -> SaveError {
-        SaveError {
-            kind: SaveErrorKind::PersistTemp,
-            source: source.error,
-        }
-    }
-}
-
-impl fmt::Display for SaveError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.kind.message())
-    }
-}
-
-impl error::Error for SaveError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        Some(&self.source)
-    }
-}
-
-/// An enumeration of the operations that can fail when executing
-/// [`InPlaceFile::save()`]
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-#[non_exhaustive]
-pub enum SaveErrorKind {
-    /// Attempting to persist the temporary file at the edited path failed
-    PersistTemp,
-
-    /// Attempting to move the edited file to the backup path failed
-    SaveBackup,
-}
-
-impl SaveErrorKind {
-    fn message(&self) -> &'static str {
-        use SaveErrorKind::*;
-        match self {
             PersistTemp => "failed to save temporary file at path",
             SaveBackup => "failed to move file to backup path",
+            Rmtemp => "failed to delete temporary file",
         }
     }
 }
 
-/// An error that can occur while executing [`InPlaceFile::discard()`]
-#[derive(Debug)]
-pub struct DiscardError {
-    kind: DiscardErrorKind,
-    source: io::Error,
-}
-
-impl DiscardError {
-    /// Returns an enum value describing the operation that failed
-    pub fn kind(&self) -> DiscardErrorKind {
-        self.kind
-    }
-
-    /// Returns the [`std::io::Error`] that occurred
-    pub fn as_io_error(&self) -> &io::Error {
-        &self.source
-    }
-
-    /// Consumes the [`DiscardError`] and returns the inner [`std::io::Error`]
-    pub fn into_io_error(self) -> io::Error {
-        self.source
-    }
-
-    fn rmtemp(source: io::Error) -> DiscardError {
-        DiscardError {
-            kind: DiscardErrorKind::Rmtemp,
-            source,
-        }
-    }
-}
-
-impl fmt::Display for DiscardError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.kind.message())
-    }
-}
-
-impl error::Error for DiscardError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        Some(&self.source)
-    }
-}
-
-/// An enumeration of the operations that can fail when executing
-/// [`InPlaceFile::discard()`]
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-#[non_exhaustive]
-pub enum DiscardErrorKind {
-    /// Attemping to delete the temporary file failed
-    Rmtemp,
-}
-
-impl DiscardErrorKind {
-    fn message(&self) -> &'static str {
-        match self {
-            DiscardErrorKind::Rmtemp => "failed to delete temporary file",
-        }
-    }
-}
-
-fn absolutize(filepath: &Path) -> Result<PathBuf, OpenError> {
+fn absolutize(filepath: &Path) -> Result<PathBuf, InPlaceError> {
     if filepath.is_absolute() {
         Ok(filepath.into())
     } else {
-        let cwd = std::env::current_dir().map_err(OpenError::cwd)?;
+        let cwd = std::env::current_dir().map_err(InPlaceError::cwd)?;
         Ok(cwd.join(filepath))
     }
 }
 
-fn mktemp(filepath: &Path) -> Result<NamedTempFile, OpenError> {
-    let dirpath = filepath.parent().ok_or_else(OpenError::no_parent)?;
+fn mktemp(filepath: &Path) -> Result<NamedTempFile, InPlaceError> {
+    let dirpath = filepath.parent().ok_or_else(InPlaceError::no_parent)?;
     Builder::new()
         .prefix("._in_place-")
         .tempfile_in(dirpath)
-        .map_err(OpenError::mktemp)
+        .map_err(InPlaceError::mktemp)
 }
 
-fn copystats(src: &Path, dest: &File, follow_symlinks: bool) -> Result<(), OpenError> {
+fn copystats(src: &Path, dest: &File, follow_symlinks: bool) -> Result<(), InPlaceError> {
     let md = if follow_symlinks {
         metadata(src)
     } else {
         symlink_metadata(src)
     }
-    .map_err(OpenError::get_metadata)?;
+    .map_err(InPlaceError::get_metadata)?;
     if !md.is_symlink() {
         dest.set_permissions(md.permissions())
-            .map_err(OpenError::set_metadata)?;
+            .map_err(InPlaceError::set_metadata)?;
     }
     Ok(())
 }
