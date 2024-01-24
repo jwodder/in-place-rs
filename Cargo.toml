@@ -1,6 +1,6 @@
 [package]
 name = "in-place"
-version = "0.2.0"
+version = "0.3.0-dev"
 edition = "2021"
 rust-version = "1.70"
 description = "In-place file processing"
@@ -16,6 +16,7 @@ tempfile = "3.5.0"
 
 [dev-dependencies]
 assert_fs = "1.0.13"
+serial_test = "3.0.0"
 tmp_env = "0.1.1"
 
 [lints.rust]
