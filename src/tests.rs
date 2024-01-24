@@ -1,6 +1,7 @@
 use super::*;
 use assert_fs::fixture::TempDir;
 use assert_fs::prelude::*;
+use serial_test::serial;
 use std::fs::{read_dir, read_link, remove_file};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::Component;
@@ -511,6 +512,7 @@ fn discard_overwrite_backup() {
 }
 
 #[test]
+#[serial]
 fn prechdir_backup() {
     let tmpdir = TempDir::new().unwrap();
     let _chdir = set_current_dir(&tmpdir);
@@ -536,6 +538,7 @@ fn prechdir_backup() {
 }
 
 #[test]
+#[serial]
 fn postchdir_backup() {
     // Assert that changing directory after opening an InPlaceFile works
     let tmpdir = TempDir::new().unwrap();
@@ -566,6 +569,7 @@ fn postchdir_backup() {
 }
 
 #[test]
+#[serial]
 fn postchdir_backup_nofollow() {
     let tmpdir = TempDir::new().unwrap();
     let filedir = tmpdir.child("filedir");
@@ -598,6 +602,7 @@ fn postchdir_backup_nofollow() {
 }
 
 #[test]
+#[serial]
 fn different_dir_backup() {
     let tmpdir = TempDir::new().unwrap();
     let _chdir = set_current_dir(&tmpdir);
@@ -626,6 +631,7 @@ fn different_dir_backup() {
 }
 
 #[test]
+#[serial]
 fn different_dir_file_backup() {
     // Assert that if the input filepath contains a directory component and the
     // backup path does not, the backup file will be created in the current
