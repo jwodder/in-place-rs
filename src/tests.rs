@@ -2,7 +2,7 @@ use super::{Backup, InPlace, InPlaceErrorKind};
 use assert_fs::fixture::TempDir;
 use assert_fs::prelude::*;
 use serial_test::serial;
-use std::fs::{metadata, read_dir, read_link, remove_file, symlink_metadata};
+use std::fs::{read_dir, read_link, remove_file};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::{Component, Path, PathBuf};
 use tmp_env::set_current_dir;
@@ -1228,6 +1228,7 @@ fn backup_links_to_file_nofollow() {
 #[cfg(unix)]
 #[test]
 fn nofollow_nocopy_symlink_perms() {
+    use std::fs::symlink_metadata;
     use std::os::unix::fs::MetadataExt;
     let tmpdir = TempDir::new().unwrap();
     let realdir = tmpdir.child("realdir");
@@ -1311,7 +1312,7 @@ fn broken_symlink_nofollow() {
 #[cfg(unix)]
 #[test]
 fn copy_executable_perm() {
-    use std::fs::set_permissions;
+    use std::fs::{metadata, set_permissions};
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
@@ -1335,7 +1336,7 @@ fn copy_executable_perm() {
 #[cfg(unix)]
 #[test]
 fn nofollow_copy_executable_perm() {
-    use std::fs::set_permissions;
+    use std::fs::{metadata, set_permissions};
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
     let tmpdir = TempDir::new().unwrap();
     let p = tmpdir.child("file.txt");
