@@ -1,10 +1,10 @@
-use super::*;
+use super::{Backup, InPlace, InPlaceErrorKind};
 use assert_fs::fixture::TempDir;
 use assert_fs::prelude::*;
 use serial_test::serial;
-use std::fs::{read_dir, read_link, remove_file};
+use std::fs::{metadata, read_dir, read_link, remove_file, symlink_metadata};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
-use std::path::Component;
+use std::path::{Component, Path, PathBuf};
 use tmp_env::set_current_dir;
 
 static TEXT: &str = concat!(
