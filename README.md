@@ -1,7 +1,7 @@
 [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 [![CI Status](https://github.com/jwodder/in-place-rs/actions/workflows/test.yml/badge.svg)](https://github.com/jwodder/in-place-rs/actions/workflows/test.yml)
 [![codecov.io](https://codecov.io/gh/jwodder/in-place-rs/branch/master/graph/badge.svg)](https://codecov.io/gh/jwodder/in-place-rs)
-[![Minimum Supported Rust Version](https://img.shields.io/badge/MSRV-1.70-orange)](https://www.rust-lang.org)
+[![Minimum Supported Rust Version](https://img.shields.io/badge/MSRV-1.74-orange)](https://www.rust-lang.org)
 [![MIT License](https://img.shields.io/github/license/jwodder/in-place-rs.svg)](https://opensource.org/licenses/MIT)
 
 [GitHub](https://github.com/jwodder/in-place-rs) | [crates.io](https://crates.io/crates/in-place) | [Documentation](https://docs.rs/in-place) | [Issues](https://github.com/jwodder/in-place-rs/issues) | [Changelog](https://github.com/jwodder/in-place-rs/blob/master/CHANGELOG.md)
