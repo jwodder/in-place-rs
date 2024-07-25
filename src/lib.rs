@@ -162,7 +162,7 @@ impl InPlace {
     ///
     /// See the documentation for the variants of [`InPlaceErrorKind`] for the
     /// operations & checks that this method can fail on.
-    pub fn open(&mut self) -> Result<InPlaceFile, InPlaceError> {
+    pub fn open(&self) -> Result<InPlaceFile, InPlaceError> {
         let path = if self.follow_symlinks {
             self.path
                 .canonicalize()
