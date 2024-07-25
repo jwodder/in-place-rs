@@ -1,5 +1,5 @@
-v0.3.0 (in development)
------------------------
+v0.2.1 (2024-07-25)
+-------------------
 - Changed the receiver of `InPlace::open()` from `&mut self` to `&self`
 - Increased MSRV to 1.74
 
