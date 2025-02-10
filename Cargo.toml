@@ -9,7 +9,7 @@ repository = "https://github.com/jwodder/in-place-rs"
 license = "MIT"
 keywords = ["edit", "in-place", "tempfile"]
 categories = ["filesystem"]
-exclude = ["/.*", "!/.cargo/"]
+exclude = ["/.*"]
 
 [dependencies]
 tempfile = "3.5.0"
