@@ -69,7 +69,7 @@
 use std::error;
 use std::ffi::OsString;
 use std::fmt;
-use std::fs::{metadata, rename, symlink_metadata, File};
+use std::fs::{File, metadata, rename, symlink_metadata};
 use std::io;
 use std::path::{Path, PathBuf};
 use tempfile::{Builder, NamedTempFile, PersistError};
