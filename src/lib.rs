@@ -80,6 +80,7 @@ pub struct InPlace {
     path: PathBuf,
     backup: Option<Backup>,
     follow_symlinks: bool,
+    create: bool,
 }
 
 impl InPlace {
@@ -90,6 +91,7 @@ impl InPlace {
             path: path.as_ref().into(),
             backup: None,
             follow_symlinks: true,
+            create: false,
         }
     }
 
@@ -136,34 +138,56 @@ impl InPlace {
         self
     }
 
+    /// If `flag` is true and the edited path does not exist, an empty file
+    /// will be opened for reading instead (`/dev/null` on Unix, `nul` on
+    /// Windows), and no backup file will be created.
+    ///
+    /// If `flag` is false (the default) and the edited path does not exist,
+    /// `open()` will return an error.
+    pub fn create(&mut self, flag: bool) -> &mut Self {
+        self.create = flag;
+        self
+    }
+
     /// Open the edited path for reading and create a temporary file for
     /// writing.
     ///
     /// The exact set & order of operations may change in a future version, but
     /// currently it is as follows:
     ///
-    /// - If `follow_symlinks` is true, the edited path is canonicalized.
-    ///   Otherwise, if it is relative, the current directory is prepended.
-    ///   (This ensures that changing the current directory while the
-    ///   [`InPlaceFile`] is open will not mess anything up.)
+    /// - Check whether the edited path exists.  (Yes, this is a giant TOCTOU
+    ///   issue, but I can't come up with a better method.)  If it doesn't, and
+    ///   `create` is false, error out.
     ///
-    /// - If a backup is set, determine the backup path based on the
-    ///   canonicalized/absolutized edited path.  If the result is a relative
-    ///   path, the current directory is prepended.
+    /// - If the edited path exists and `follow_symlinks` is true, the edited
+    ///   path is canonicalized.  Otherwise, if the edited path is relative,
+    ///   the current directory is prepended.  (This ensures that changing the
+    ///   current directory while the [`InPlaceFile`] is open will not mess
+    ///   anything up.)
     ///
-    /// - Create a named temporary file in the edited path's parent directory.
+    /// - If the edited path exists and a backup is set, determine the backup
+    ///   path based on the canonicalized/absolutized edited path.  If the
+    ///   result is a relative path, the current directory is prepended.
+    ///
+    /// - Create a named temporary file for writing in the edited path's parent
+    ///   directory.
     ///
     /// - If the edited path is not a symlink, copy its permission bits to the
     ///   temporary file.
     ///
-    /// - Open the edited path for reading.
+    /// - Open the edited path (or the null device if the edited path doesn't
+    ///   exist) for reading.
     ///
     /// # Errors
     ///
     /// See the documentation for the variants of [`InPlaceErrorKind`] for the
     /// operations & checks that this method can fail on.
     pub fn open(&self) -> Result<InPlaceFile, InPlaceError> {
-        let path = if self.follow_symlinks {
+        let exists = self.path.exists();
+        if !exists && !self.create {
+            return Err(InPlaceError::file_not_found());
+        }
+        let path = if exists && self.follow_symlinks {
             self.path
                 .canonicalize()
                 .map_err(InPlaceError::canonicalize)?
@@ -172,13 +196,22 @@ impl InPlace {
         };
         // Don't try to canonicalize backup_path, as it likely won't exist,
         // which would lead to an error
-        let backup_path = match self.backup.as_ref() {
+        let backup_path = match self.backup.as_ref().filter(|_| exists) {
             Some(bkp) => Some(absolutize(&bkp.apply(&path)?)?),
             None => None,
         };
         let writer = mktemp(&path)?;
-        copystats(&path, writer.as_file(), self.follow_symlinks)?;
-        let reader = File::open(&path).map_err(InPlaceError::open)?;
+        let reader = if exists {
+            copystats(&path, writer.as_file(), self.follow_symlinks)?;
+            File::open(&path).map_err(InPlaceError::open)?
+        } else {
+            File::open(cfg_select! {
+                unix => { "/dev/null" },
+                windows => { "nul" },
+                _ => { compile_error!("in-place only supports Unix and Windows") },
+            })
+            .map_err(InPlaceError::open)?
+        };
         Ok(InPlaceFile {
             reader,
             writer,
@@ -364,6 +397,13 @@ impl InPlaceError {
         self.source
     }
 
+    fn file_not_found() -> InPlaceError {
+        InPlaceError {
+            kind: InPlaceErrorKind::FileNotFound,
+            source: None,
+        }
+    }
+
     fn get_metadata(source: io::Error) -> InPlaceError {
         InPlaceError {
             kind: InPlaceErrorKind::GetMetadata,
@@ -469,11 +509,14 @@ impl error::Error for InPlaceError {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum InPlaceErrorKind {
+    /// Returned by [`InPlace::open()`] when the edited path does not exist and
+    /// `create` is false.
+    ///
+    /// This error kind does not have a source error.
+    FileNotFound,
+
     /// Returned by [`InPlace::open()`] if attempting to canonicalize the
     /// edited path failed.
-    ///
-    /// This error kind occurs when the edited path does not exist and
-    /// `follow_symlinks` is true.
     Canonicalize,
 
     /// Returned by [`InPlace::open()`] if attempting to fetch the current
@@ -488,9 +531,6 @@ pub enum InPlaceErrorKind {
 
     /// Returned by [`InPlace::open()`] if attempting to fetch metadata &
     /// permission details about the edited file failed.
-    ///
-    /// This error kind occurs when the edited path does not exist and
-    /// `follow_symlinks` is false.
     GetMetadata,
 
     /// Returned by [`InPlace::open()`] if attempting to create the temporary
@@ -534,6 +574,7 @@ impl InPlaceErrorKind {
     fn message(&self) -> &'static str {
         use InPlaceErrorKind::*;
         match self {
+            FileNotFound => "file not found",
             Canonicalize => "failed to canonicalize path",
             CurrentDir => "failed to fetch current directory",
             EmptyBackup => "backup path is empty",
