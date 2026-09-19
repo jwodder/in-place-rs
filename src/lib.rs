@@ -173,7 +173,8 @@ impl InPlace {
     ///   directory.
     ///
     /// - If the edited path is not a symlink, copy its permission bits to the
-    ///   temporary file.
+    ///   temporary file.  On Unix, the uid & gid are first copied as well,
+    ///   with any failures to set them ignored.
     ///
     /// - Open the edited path (or the null device if the edited path doesn't
     ///   exist) for reading.
@@ -616,6 +617,14 @@ fn copystats(src: &Path, dest: &File, follow_symlinks: bool) -> Result<(), InPla
     }
     .map_err(InPlaceError::get_metadata)?;
     if !md.is_symlink() {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::{MetadataExt, fchown};
+            // Based on GNU sed's behavior:
+            if fchown(dest, Some(md.uid()), Some(md.gid())).is_err() {
+                let _ = fchown(dest, None, Some(md.gid()));
+            }
+        }
         dest.set_permissions(md.permissions())
             .map_err(InPlaceError::set_metadata)?;
     }
