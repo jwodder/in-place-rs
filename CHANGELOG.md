@@ -1,5 +1,5 @@
-v0.3.0 (in development)
------------------------
+v0.3.0 (2026-09-19)
+-------------------
 - Increased MSRV to 1.95
 - Added a `create(bool)` option that makes `InPlace` open an empty file for
   reading if the edited path does not exist

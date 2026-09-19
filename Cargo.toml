@@ -1,6 +1,6 @@
 [package]
 name = "in-place"
-version = "0.3.0-dev"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.95"
 description = "In-place file processing"
