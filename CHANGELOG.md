@@ -1,6 +1,10 @@
 v0.3.0 (in development)
 -----------------------
-- Increased MSRV to 1.93.1
+- Increased MSRV to 1.95
+- Added a `create(bool)` option that makes `InPlace` open an empty file for
+  reading if the edited path does not exist
+- If the edited path does not exist and `create` is false, `InPlace::open()`
+  now always returns an error with the `FileNotFound` error kind variant
 
 v0.2.1 (2024-07-25)
 -------------------

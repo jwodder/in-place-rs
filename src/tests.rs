@@ -3,7 +3,7 @@ use assert_fs::fixture::TempDir;
 use assert_fs::prelude::*;
 use serial_test::serial;
 use std::fs::{read_dir, read_link, remove_file};
-use std::io::{self, BufRead, BufReader, BufWriter, Write};
+use std::io::{self, BufRead, BufReader, BufWriter, Write, read_to_string};
 use std::path::{Component, Path, PathBuf};
 use tmp_env::set_current_dir;
 
@@ -717,9 +717,9 @@ fn edit_nonexistent() {
     let r = InPlace::new(p).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), InPlaceErrorKind::Canonicalize);
-    assert_eq!(e.to_string(), "failed to canonicalize path");
-    assert!(e.as_io_error().is_some());
+    assert_eq!(e.kind(), InPlaceErrorKind::FileNotFound);
+    assert_eq!(e.to_string(), "file not found");
+    assert!(e.as_io_error().is_none());
     assert!(listdir(&tmpdir).unwrap().is_empty());
 }
 
@@ -730,9 +730,9 @@ fn edit_nonexistent_nofollow() {
     let r = InPlace::new(p).follow_symlinks(false).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), InPlaceErrorKind::GetMetadata);
-    assert_eq!(e.to_string(), "failed to get metadata for path");
-    assert!(e.as_io_error().is_some());
+    assert_eq!(e.kind(), InPlaceErrorKind::FileNotFound);
+    assert_eq!(e.to_string(), "file not found");
+    assert!(e.as_io_error().is_none());
     assert!(listdir(&tmpdir).unwrap().is_empty());
 }
 
@@ -1283,9 +1283,9 @@ fn broken_symlink() {
     let r = InPlace::new(&p).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), InPlaceErrorKind::Canonicalize);
-    assert_eq!(e.to_string(), "failed to canonicalize path");
-    assert!(e.as_io_error().is_some());
+    assert_eq!(e.kind(), InPlaceErrorKind::FileNotFound);
+    assert_eq!(e.to_string(), "file not found");
+    assert!(e.as_io_error().is_none());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     assert_eq!(read_link(&p).unwrap(), target);
 }
@@ -1302,9 +1302,9 @@ fn broken_symlink_nofollow() {
     let r = InPlace::new(&p).follow_symlinks(false).open();
     assert!(r.is_err());
     let e = r.unwrap_err();
-    assert_eq!(e.kind(), InPlaceErrorKind::Open);
-    assert_eq!(e.to_string(), "failed to open file for reading");
-    assert!(e.as_io_error().is_some());
+    assert_eq!(e.kind(), InPlaceErrorKind::FileNotFound);
+    assert_eq!(e.to_string(), "file not found");
+    assert!(e.as_io_error().is_none());
     assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
     assert_eq!(read_link(&p).unwrap(), target);
 }
@@ -1371,4 +1371,171 @@ fn append_no_filename_nofollow() {
     assert_eq!(e.to_string(), "path does not have a filename");
     assert!(e.as_io_error().is_none());
     assert!(listdir(&tmpdir).unwrap().is_empty());
+}
+
+#[test]
+fn create_nonexistent() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    {
+        let inp = InPlace::new(&p).create(true).open().unwrap();
+        assert_eq!(read_to_string(inp.reader()).unwrap(), "");
+        writeln!(inp.writer(), "It's alive!").unwrap();
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert("It's alive!\n");
+}
+
+#[test]
+fn create_nonexistent_nofollow() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    {
+        let inp = InPlace::new(&p)
+            .create(true)
+            .follow_symlinks(false)
+            .open()
+            .unwrap();
+        assert_eq!(read_to_string(inp.reader()).unwrap(), "");
+        writeln!(inp.writer(), "It's alive!").unwrap();
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert("It's alive!\n");
+}
+
+#[test]
+fn create_nonexistent_nothing_backedup() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    {
+        let inp = InPlace::new(&p)
+            .create(true)
+            .backup(Backup::Append("~".into()))
+            .open()
+            .unwrap();
+        assert_eq!(read_to_string(inp.reader()).unwrap(), "");
+        writeln!(inp.writer(), "It's alive!").unwrap();
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert("It's alive!\n");
+}
+
+#[test]
+fn create_extant() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    {
+        let inp = InPlace::new(&p).create(true).open().unwrap();
+        let reader = BufReader::new(inp.reader());
+        {
+            let mut writer = BufWriter::new(inp.writer());
+            for line in reader.lines() {
+                writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+            }
+            writer.flush().unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert(SWAPPED_TEXT);
+}
+
+#[test]
+fn create_extant_backup() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    p.write_str(TEXT).unwrap();
+    {
+        let inp = InPlace::new(&p)
+            .create(true)
+            .backup(Backup::Append("~".into()))
+            .open()
+            .unwrap();
+        let reader = BufReader::new(inp.reader());
+        {
+            let mut writer = BufWriter::new(inp.writer());
+            for line in reader.lines() {
+                writeln!(writer, "{}", swapcase(&line.unwrap())).unwrap();
+            }
+            writer.flush().unwrap();
+        }
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt", "file.txt~"]);
+    p.assert(SWAPPED_TEXT);
+    tmpdir.child("file.txt~").assert(TEXT);
+}
+
+#[test]
+fn nosuchdir() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("nonexistent").child("file.txt");
+    let r = InPlace::new(p).open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    assert_eq!(e.kind(), InPlaceErrorKind::FileNotFound);
+    assert_eq!(e.to_string(), "file not found");
+    assert!(e.as_io_error().is_none());
+    assert!(listdir(&tmpdir).unwrap().is_empty());
+}
+
+#[test]
+fn create_nosuchdir() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("nonexistent").child("file.txt");
+    let r = InPlace::new(p).create(true).open();
+    assert!(r.is_err());
+    let e = r.unwrap_err();
+    // TODO: Should this be InPlaceErrorKind::FileNotFound instead?
+    assert_eq!(e.kind(), InPlaceErrorKind::Mktemp);
+    assert_eq!(e.to_string(), "failed to create temporary file");
+    assert!(e.as_io_error().is_some());
+    assert!(listdir(&tmpdir).unwrap().is_empty());
+}
+
+#[test]
+fn create_broken_symlink() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    let target = PathBuf::from("nowhere.txt");
+    if !mklink(&target, &p).unwrap() {
+        // No symlinks; skip test
+        return;
+    }
+    {
+        let inp = InPlace::new(&p).create(true).open().unwrap();
+        assert_eq!(read_to_string(inp.reader()).unwrap(), "");
+        writeln!(inp.writer(), "It's alive!").unwrap();
+        inp.save().unwrap();
+    }
+    // TODO: Should the contents end up at nowhere.txt instead?
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert("It's alive!\n");
+}
+
+#[test]
+fn create_broken_symlink_nofollow() {
+    let tmpdir = TempDir::new().unwrap();
+    let p = tmpdir.child("file.txt");
+    let target = PathBuf::from("nowhere.txt");
+    if !mklink(&target, &p).unwrap() {
+        // No symlinks; skip test
+        return;
+    }
+    {
+        let inp = InPlace::new(&p)
+            .create(true)
+            .follow_symlinks(false)
+            .open()
+            .unwrap();
+        assert_eq!(read_to_string(inp.reader()).unwrap(), "");
+        writeln!(inp.writer(), "It's alive!").unwrap();
+        inp.save().unwrap();
+    }
+    assert_eq!(listdir(&tmpdir).unwrap(), ["file.txt"]);
+    p.assert("It's alive!\n");
 }
