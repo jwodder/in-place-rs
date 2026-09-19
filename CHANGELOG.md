@@ -5,6 +5,7 @@ v0.3.0 (in development)
   reading if the edited path does not exist
 - If the edited path does not exist and `create` is false, `InPlace::open()`
   now always returns an error with the `FileNotFound` error kind variant
+- On Unix, copy the UID & GID of the edited path to the new file, if possible
 
 v0.2.1 (2024-07-25)
 -------------------
